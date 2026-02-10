@@ -1,0 +1,204 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Накладной</title>
+    <style>
+        body {
+            font-family: Times New Roman, sans-serif;
+            line-height: 1.2;
+            font-size: 12px;
+        }
+
+        .container {
+            margin: 0 auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            padding: 3px;
+            text-align: left;
+        }
+
+        #main {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+            #main th {
+                border: 1px solid #000;
+                text-align: center;
+            }
+
+            #main td {
+                border: 1px solid #000;
+            }
+
+        .section th {
+            background: lightgray;
+            width: 100px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .signature {
+            margin-top: 20px;
+        }
+
+        .section p {
+            text-align: justify;
+            margin: 0;
+        }
+
+        .section h3 {
+            text-align: center;
+        }
+
+        .section h4 {
+            margin-bottom: 0;
+        }
+
+        span {
+            font-weight: bold;
+        }
+
+        .colH1 {
+            width: 10%;
+            text-align: right;
+        }
+
+        .colH2 {
+            width: 40%;
+        }
+
+        .col1 {
+            width: 15%;
+        }
+
+        .col2 {
+            width: 65%;
+            border-bottom: 1px dashed;
+        }
+
+        .col3 {
+            width: 15%;
+            border-bottom: 1px dashed;
+        }
+
+        .col0 {
+            width: 5px;
+        }
+
+
+        /*        p {
+            line-height: 1.2;
+        }*/
+        .doc-header {
+            display: grid;
+            grid-template-columns: 140px 1fr 140px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .logo img {
+            width: 140px;
+            height: auto;
+        }
+
+        .title {
+            flex: 1; /* занимает всё оставшееся место */
+            text-align: center; /* и тогда и <h4>, и <p> будут по центру */
+            border-bottom: 3px double gray;
+        }
+
+            .title h3 {
+                margin: 0;
+                margin-bottom: 5px;
+            }
+
+            .title span {
+                font-weight: normal;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <div class="title">
+            <h3>Интиқоли бор №[Number]. Сана [DateTime]</h3>
+        </div>
+
+        <div class="secion">
+            <table>
+                <tr>
+                    <td class="colH1"> Аз анбор: </td>
+                    <td class="colH2"> [Store] </td>
+                    <td class="colH1"> Ба анбор: </td>
+                    <td class="colH2"> [ToStore] </td>
+                </tr>
+            </table>
+
+        </div>
+
+        <div class="secion">
+            <table id="main">
+                <theader>
+                    <tr>
+                        <th style="width:35px;">№</th>
+                        <th style="width:110px;">Истеҳсол</th>
+                        <th>Номгуй</th>
+                        <th style="width:90px;">Миқдор</th>
+                        <th style="width:90px;">Нарх</th>
+                        <th style="width:90px;">Маб. умумӣ</th>
+                    </tr>
+                </theader>
+                [ProductsTable]
+                <tfooter>
+                    <tr>
+                        <th></th>
+                        <th>Ҳамагӣ</th>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th style="text-align: right;">[Total]</th>
+                    </tr>
+                </tfooter>
+            </table>
+
+        </div>
+
+        <div class="secion">
+            <table style="width:80%;">
+                <tr>
+                    <td class="col1"> Роҳӣ кард: </td>
+                    <td class="col2"></td>
+                    <td class="col0"></td>
+                    <td class="col3"></td>
+                </tr>
+                <tr><td></td><td style="text-align:center;">(ному насаб)</td><td></td><td style="text-align:center;">(имзо)</td></tr>
+                <tr><td></td></tr>
+                <tr>
+                    <td class="col1"> Қабул кард: </td>
+                    <td class="col2"></td>
+                    <td class="col0"></td>
+                    <td class="col3"></td>
+                </tr>
+                <tr><td></td><td style="text-align:center;">(ному насаб)</td><td></td><td style="text-align:center;">(имзо)</td></tr>
+            </table>
+
+        </div>
+    </div>
+</body>
+</html>

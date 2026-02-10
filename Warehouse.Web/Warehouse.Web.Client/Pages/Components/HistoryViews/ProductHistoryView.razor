@@ -1,0 +1,51 @@
+﻿@using System.Text.Json
+@using System.Text
+@inject HttpClient client
+
+<MudGrid Style="padding: 0 0 10px 0;">
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@name Label="Наименования" Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@manufacturer Label="Производитель" Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@unit Label="Ед. изм." Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudNumericField @bind-Value=@buyPrice Label="Цена закупки" Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudNumericField @bind-Value=@sellPrice Label="Цена продажи" Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudNumericField @bind-Value=@limit Label="Лимит" Disabled />
+    </MudItem>
+</MudGrid>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public ProductResponse Product { get; set; }
+
+    private MudForm form;
+
+    string? name;
+    string? manufacturer;
+    string? unit;
+    decimal? buyPrice;
+    decimal? sellPrice;
+    int limit;
+
+    protected override void OnInitialized()
+    {
+        name = Product.Name;
+        manufacturer = Product.Manufacturer;
+        unit = Product.Unit;
+        buyPrice = Product.BuyPrice;
+        sellPrice = Product.SellPrice;
+        limit = Product.LimitRemain;
+    }
+}

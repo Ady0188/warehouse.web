@@ -1,0 +1,258 @@
+﻿@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="CustomTheme" IsDarkMode="@_appSettings.IsDarkTheme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary">
+        @if (_appSettings.MenuType == MenuType.Side)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        }
+
+        <MudText Typo="Typo.h5" Class="ml-3">Складской учёт</MudText>
+
+        <MudSpacer />
+
+        @if (_appSettings.MenuType == MenuType.Top)
+        {
+            <TopMenu />
+        }
+
+        <ProfileMenu SettingsDrawerToggle="SettingsDrawerToggle" />
+
+        @* <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+
+            <MudMenuItem Icon="@Icons.Material.Filled.Person">Профиль</MudMenuItem>
+
+            <MudMenuItem OnClick="SettingsDrawerToggle" Icon="@Icons.Material.Filled.Settings">Настройки</MudMenuItem>
+
+            <AuthorizeView>
+                <Authorized>
+                    <form action="Account/Logout" method="post">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="@Nav.ToBaseRelativePath(Nav.Uri)" />
+                        <button type="submit" class="mud-nav-link mud-ripple">
+                            <MudIcon Icon="@Icons.Material.Filled.Logout" Class="mr-2" /> Выход
+                        </button>
+                    </form>
+                </Authorized>
+            </AuthorizeView>
+
+        </MudMenu> *@
+    </MudAppBar>
+
+    @if (_appSettings.MenuType == MenuType.Side)
+    {
+        <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+            <NavMenu />
+        </MudDrawer>
+    }
+    <MudMainContent Class="mt-16 pa-4 content-with-logo" id="mainContent">
+        <div class="content-body">
+            @Body
+        </div>
+    </MudMainContent>
+
+    <MudDrawer @bind-Open="_settingsDrawerOpen"
+    ClipMode="DrawerClipMode.Always"
+    Anchor="Anchor.Right"
+    Elevation="2"
+    Class="pa-2">
+
+        <MudNavMenu Class="mud-width-full">
+            <MudStack Row>
+                <MudText Typo="Typo.h6" Class="px-2 pb-2">⚙ Настройки</MudText>
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" Size="Size.Small" OnClick="SettingsDrawerToggle" />
+            </MudStack>
+            <MudDivider Class="mb-2" />
+
+            @if (_appSettings.MenuType == MenuType.Side)
+            {
+                <MudMenuItem OnClick="@(_ => SetMenu(MenuType.Top))" Icon="@Icons.Material.Filled.ViewStream">
+                    Верхнее меню
+                </MudMenuItem>
+            }
+
+            @if (_appSettings.MenuType == MenuType.Top)
+            {
+                <MudMenuItem OnClick="@(_ => SetMenu(MenuType.Side))" Icon="@Icons.Material.Filled.ViewSidebar">
+                    Боковое меню
+                </MudMenuItem>
+            }
+
+        </MudNavMenu>
+
+        <MudSpacer />
+
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudMenu Dense FullWidth StartIcon=@Icons.Custom.Uncategorized.ColorPalette IconColor="Color.Primary" Label="Тема" Variant="Variant.Text" AnchorOrigin=Origin.TopLeft TransformOrigin=Origin.BottomLeft Color="Color.Default" Size="Size.Large">
+                @foreach (var item in ThemeList)
+                {
+                    <MudMenuItem OnClick="@(() => ChangeTheme(item))">
+                        <MudAvatar Size="Size.Small"
+                                   Class="mr-2"
+                                   Style=@($"background-color:{item.PrimaryColor}") />
+                        @item.Name
+                    </MudMenuItem>
+                }
+            </MudMenu>
+            <MudIconButton OnClick="@(_ => ToggleTheme())" Icon="@(_appSettings.IsDarkTheme? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" />
+        </MudStack>
+    </MudDrawer>
+</MudLayout>
+
+@* <MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h5" Class="ml-3">Warehouse</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End" />
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent Class="mt-16 pa-4">
+        @Body
+    </MudMainContent>
+</MudLayout> *@
+
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+
+
+
+
+
+
+
+    private AppSettings _appSettings = new AppSettings();
+
+    protected override async Task OnAfterRenderAsync(bool isFirstRender)
+    {
+        if (isFirstRender)
+        {
+            _appSettings = await GetSettings();
+
+            _drawerOpen = true;
+            CustomTheme = ThemeStorage.GetTheme(_appSettings.ThemeIndex);
+            StateHasChanged();
+        }
+    }
+
+    async Task SetMenu(MenuType menu)
+    {
+        _appSettings.MenuType = menu;
+        _settingsDrawerOpen = false;
+
+        await SetSettings(_appSettings);
+    }
+
+    private async Task ToggleTheme()
+    {
+        _appSettings.IsDarkTheme = !_appSettings.IsDarkTheme;
+
+        await SetSettings(_appSettings);
+    }
+
+    private async Task SetSettings(AppSettings settings)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(settings);
+        await LocalStorage.SetItemAsync("appSettings", json);
+    }
+
+    private async Task<AppSettings> GetSettings()
+    {
+        var settings = await LocalStorage.GetItemAsStringAsync("appSettings");
+
+        if (!string.IsNullOrEmpty(settings))
+        {
+            var json = System.Text.Json.JsonSerializer.Deserialize<string>(settings)!;
+            return System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json)!;
+        }
+
+        return new AppSettings();
+    }
+
+
+    private MudTheme CustomTheme = ThemeStorage.GetTheme(0);
+
+    private async Task ChangeTheme(ThemeItem item)
+    {
+        CustomTheme = item.Theme;
+        _appSettings.ThemeIndex = item.Index;// ThemeStorage.SetTheme(item.Name);
+        await SetSettings(_appSettings);
+        StateHasChanged();
+    }
+
+    private bool _drawerOpen = false;
+    private bool _settingsDrawerOpen = false;
+
+    private void SettingsDrawerToggle()
+    {
+        _settingsDrawerOpen = !_settingsDrawerOpen;
+    }
+
+    private void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    public class ThemeItem
+    {
+        public string Name { get; set; } = "";
+        public MudTheme Theme { get; set; } = default!;
+        public string PrimaryColor { get; set; } = "";
+        public int Index { get; set; }
+    }
+
+    static readonly List<ThemeItem> ThemeList = new()
+    {
+        new ThemeItem
+        {
+            Name = "Синий стальной",
+            Theme = ThemeStorage.GetTheme(0),
+            PrimaryColor = ThemeStorage.GetTheme(0).PaletteLight.Primary.ToString(),
+            Index = 0
+        },
+        new ThemeItem
+        {
+            Name = "Графитовый",
+            Theme = ThemeStorage.GetTheme(1),
+            PrimaryColor = ThemeStorage.GetTheme(1).PaletteLight.Primary.ToString(),
+            Index = 1
+        },
+        new ThemeItem
+        {
+            Name = "Янтарный",
+            Theme = ThemeStorage.GetTheme(2),
+            PrimaryColor = ThemeStorage.GetTheme(2).PaletteLight.Primary.ToString(),
+            Index = 2
+        },
+        new ThemeItem
+        {
+            Name = "Зелёный",
+            Theme = ThemeStorage.GetTheme(3),
+            PrimaryColor = ThemeStorage.GetTheme(3).PaletteLight.Primary.ToString(),
+            Index = 3
+        },
+        new ThemeItem
+        {
+            Name = "Default",
+            Theme = ThemeStorage.GetTheme(4),
+            PrimaryColor = ThemeStorage.GetTheme(4).PaletteLight.Primary.ToString(),
+            Index = 4
+        }
+    };
+}
+
+

@@ -1,0 +1,18 @@
+﻿@if (!string.IsNullOrEmpty(DisplayMessage))
+{
+    var severity = DisplayMessage.StartsWith("Error") || !IsSuccess ? Severity.Error : Severity.Success;
+
+    <MudAlert Variant="Variant.Outlined" Severity="@severity">@DisplayMessage</MudAlert>
+}
+
+@code {
+    private string? messageFromCookie;
+
+    [Parameter]
+    public bool IsSuccess { get; set; }
+
+    [Parameter]
+    public string? Message { get; set; }
+
+    private string? DisplayMessage => Message ?? messageFromCookie;
+}

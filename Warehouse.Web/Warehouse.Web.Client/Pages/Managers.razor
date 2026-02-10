@@ -1,0 +1,270 @@
+﻿@page "/managers"
+
+@inject HttpClient client
+
+@attribute [Authorize]
+
+<PageContent Title="Менеджеры" @ref=pageContent FilterExpanded=@_filterExpanded OnApplyFilter="ApplyFilter" OnResetFilter="ResetFilter">
+    <ActionBar>
+        <MudButton Variant=@filterVariant Size="Size.Small" Color="Color.Info" StartIcon=@Icons.Material.Filled.FilterAlt OnClick=@(() => _filterExpanded = true)>Фильтр</MudButton>
+        <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" StartIcon=@Icons.Material.Filled.Add OnClick="OpenAddDialogAsync">Добавить</MudButton>
+    </ActionBar>
+    <FilterBar>
+        <MudStack Row>
+            <MudTextField @bind-Value=@filter.Lastname Label="Фамилия" Clearable />
+            <MudTextField @bind-Value=@filter.Firstname Label="Имя" Clearable />
+            <MudTextField @bind-Value=@filter.Phone Label="Номер телефона" Clearable />
+            <MudTextField @bind-Value=@filter.Address Label="Адрес" Clearable />
+            <MyMudSelect TItem="long" @bind-Value=@filter.StoreId Label="Склад" Items=@stores Clearable Dense />
+        </MudStack>
+    </FilterBar>
+    <ChildContent>
+        <MudTable ServerData="ServerReload" Dense="true" Hover="true" Striped="true" @ref=table>
+            <HeaderContent>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    <MudTh><MudTableSortLabel SortLabel=@col.PropertyName T="ManagerResponse" Style=@col.Style>@col.Title</MudTableSortLabel></MudTh>
+                }
+                <MudTh Style="width: 100px;"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    <MudTd>@GetValue(context, col.PropertyName, col.StringFormat)</MudTd>
+                }
+                <MudTd>
+                    <MudStack Row=true AlignItems=AlignItems.Center Style="width: 100%;">
+                        <ActionButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Tooltip="Редактировать" OnClick=@(() => OpenEditDialogAsync(context)) />
+                        <ActionButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Tooltip="Удалить" OnClick=@(() => OnDeleteAsync(context)) />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Нет данных, соответствующих фильтру</MudText>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Загрузка...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+            </PagerContent>
+        </MudTable>
+    </ChildContent>
+</PageContent>
+
+@code {
+    private string _buttonText = "ФИО";
+    bool IsLoading;
+    private MudTable<ManagerResponse> table;
+
+    PageContent pageContent;
+    MudMessageBox _messageBox => pageContent.MessageBox;
+
+    Dictionary<long, string> stores = new();
+
+    DialogOptions dialogOptions => new() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false };
+
+    bool _filterExpanded = false;
+    FilterModel filter = new();
+    Variant filterVariant = Variant.Outlined;
+
+    private async Task ApplyFilter()
+    {
+        pagedRequest.Filter = filter.ToString();
+
+        await table.ReloadServerData();
+
+        _filterExpanded = false;
+        filterVariant = filter.IsEmpty ? Variant.Outlined : Variant.Filled;
+    }
+
+    private async Task ResetFilter()
+    {
+        filter = new();
+        
+        await ApplyFilter();
+    }
+
+    object? GetValue(object obj, string propertyName, string? stringFormat = null)
+    {
+        var prop = obj.GetType().GetProperty(propertyName);
+        var value = prop?.GetValue(obj);
+
+        if (value is null)
+            return null;
+
+        if (!string.IsNullOrEmpty(stringFormat))
+        {
+            if (value is IFormattable formattable)
+                return formattable.ToString(stringFormat, null);
+        }
+
+        return value;
+    }
+
+    List<ColumnDefinition> Columns;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Columns = await LocalStorage.GetManagerColumns();
+    }
+
+    private async Task OnDeleteAsync(ManagerResponse managerResponse)
+    {
+        var message = await _messageBox.ShowAsync();
+
+        if (message is not null)
+        {
+            var response = await client.DeleteAsync($"{ApiEndpoints.V1.Managers.Create}/{managerResponse.Id}");
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                await table.ReloadServerData();
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private async Task OpenEditDialogAsync(ManagerResponse managerResponse)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<AddOrEditManagerDialog>
+        {
+            { x => x.Manager, managerResponse },
+            { x => x.Stores, stores },
+            { x => x.IsEdit, true }
+        };
+
+        var dialog = await DialogService.ShowAsync<AddOrEditManagerDialog>("Редактировать", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    private async Task OpenAddDialogAsync()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<AddOrEditManagerDialog>
+        {
+            { x => x.Stores, stores }
+        };
+
+        var dialog = await DialogService.ShowAsync<AddOrEditManagerDialog>("Добавить", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    PagedRequest pagedRequest = new();
+    private async Task<TableData<ManagerResponse>> ServerReload(TableState state, CancellationToken token)
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        if (pagedRequest.ResetPage)
+        {
+            pagedRequest.ResetPage = false;
+
+            if (state.Page != 0)
+                table.NavigateTo(0);
+        }
+
+        pagedRequest.Refresh(state);
+
+        string content = string.Empty;
+        try
+        {
+            var response = await client.GetAsync($"{ApiEndpoints.V1.Managers.GetAll}?{pagedRequest.ToQuery()}", token);
+            content = await response.Content.ReadAsStringAsync();
+
+            var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+            var result = await response.Content.ReadFromJsonAsync<ManagersResponse>(options);
+
+            if (response.IsSuccessStatusCode && result is not null)
+            {
+                IsLoading = false;
+
+                StateHasChanged();
+
+                stores = result.Stores.ToDictionary(x => x.Id, x => x.Name) ?? new Dictionary<long, string>();
+
+                return new TableData<ManagerResponse>
+                    {
+                        TotalItems = result.Total,
+                        Items = result.Items
+                    };
+            }
+        }
+        catch (JsonException ex)
+        {
+            if (ex.Message.StartsWith("'<' is an invalid start of a value"))
+            {
+                Nav.NavigateTo(Nav.Uri, forceLoad: true);
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+
+            StateHasChanged();
+        }
+
+        return await Task.FromResult(new TableData<ManagerResponse>
+            {
+                Items = new List<ManagerResponse>()
+            });
+
+    }
+
+    public class FilterModel
+    {
+        public string? Lastname { get; set; }
+        public string? Firstname { get; set; }
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public long? StoreId { get; set; }
+
+        public bool IsEmpty => string.IsNullOrEmpty(Firstname) &&
+                   string.IsNullOrEmpty(Lastname) &&
+                   string.IsNullOrEmpty(Phone) &&
+                   string.IsNullOrEmpty(Address) &&
+                   !StoreId.HasValue;
+
+        public override string ToString()
+        {
+            List<string> result = new List<string>();
+
+            if (!string.IsNullOrEmpty(Firstname))
+                result.Add($"(Firstname,{Firstname})");
+            if (!string.IsNullOrEmpty(Lastname))
+                result.Add($"(Lastname,{Lastname})");
+            if (!string.IsNullOrEmpty(Phone))
+                result.Add($"(Phone,{Phone})");
+            if (!string.IsNullOrEmpty(Address))
+                result.Add($"(Address,{Address})");
+            if (StoreId.HasValue)
+                result.Add($"(StoreId,{StoreId})");
+
+            return string.Join("and", result);
+        }
+    }
+}

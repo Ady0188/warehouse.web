@@ -1,0 +1,43 @@
+﻿<MudGrid Style="padding: 0 0 10px 0;">
+    <MudItem xs="4">
+        <MudDateTimePicker Label="От" @bind-Value=@date Disabled />
+    </MudItem>
+    <MudItem xs="8">
+        <MudTextField T="string" @bind-Value=@StoreName Label="Склад" Disabled />
+    </MudItem>
+    <MudItem xs="8">
+        <MudTextField T="string" @bind-Value=@AgentName Label="Контрагент" Disabled />
+    </MudItem>
+    <MudItem xs="4">
+        <MudNumericField T="decimal" @bind-Value=@amount Label="Сумма" Disabled />
+    </MudItem>
+    <MudItem xs="12">
+        <MudTextField T="string" @bind-Value=@comment Label="Коментария" Lines="3" Clearable />
+    </MudItem>
+</MudGrid>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public string StoreName { get; set; }
+    [Parameter]
+    public string AgentName { get; set; }
+
+    [Parameter]
+    public OrderResponse Order { get; set; }
+
+    OrderType OrderType => (OrderType)Order.Type;
+
+    DateTime date = DateTime.Now;
+    decimal amount;
+    string? comment;
+
+    protected override void OnInitialized()
+    {
+        date = Order.Date;
+        amount = Order.Amount;
+        comment = Order.Comment;
+    }
+}

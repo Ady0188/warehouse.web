@@ -1,0 +1,81 @@
+﻿@if (IsOperation)
+{
+    <OperationHistoryView Operation=Operation @key=Operation AgentName="@AgentName" StoreName="@StoreName" ToStoreName="@StoreName" />
+}
+else if (IsOrder)
+{
+    <OrderHistoryView Order=Order AgentName="@AgentName" StoreName="@StoreName" />
+}
+else if (IsAgent)
+{
+    <AgentHistoryView Agent="Agent" StoreName="@StoreName" ManagerName="@ManagerName" />
+}
+else if (IsManager)
+{
+    <ManagerHistoryView Manager="Manager" StoreName="@StoreName" />
+}
+else if (IsUser)
+{
+    @* <UserHistoryView User="User" />
+}
+else if (IsStore)
+{
+    <StoreHistoryView Store="Store" /> *@
+}
+else if (IsProduct)
+{
+    <ProductHistoryView Product="Product" />
+}
+else if (IsSendOrReceive)
+{
+    @* <SendOrReceiveHistoryView SendOrReceive="SendOrReseive" />
+}
+else if (IsGoodsAudit)
+{
+    <GoodsAuditHistoryView GoodsAudit="GoodsAudit" /> *@
+}
+
+@code {
+    bool IsOperation => Conditions["operation"];
+    bool IsOrder => Conditions["order"];
+    bool IsAgent => Conditions["agent"];
+    bool IsManager => Conditions["manager"];
+    bool IsUser => Conditions["user"];
+    bool IsStore => Conditions["store"];
+    bool IsProduct => Conditions["product"];
+    bool IsSendOrReceive => Conditions["sendOrReceive"];
+    bool IsGoodsAudit => Conditions["goodsAudit"];
+
+    [Parameter]
+    public string StoreName {get;set;}
+    [Parameter]
+    public string ManagerName {get;set;}
+    [Parameter]
+    public string AgentName {get;set;}
+
+    [Parameter]
+    public OperationResponse Operation {get;set;}
+    [Parameter]
+    public OrderResponse Order {get;set;}
+    [Parameter]
+    public AgentResponse Agent {get;set;}
+    [Parameter]
+    public ManagerResponse Manager {get;set;}
+    [Parameter]
+    public UserResponse User {get;set;}
+    [Parameter]
+    public StoreResponse Store {get;set;}
+    [Parameter]
+    public ProductResponse Product { get; set; }
+    // [Parameter]
+    // public SendOrReceiveResponse SendOrReseive {get;set;}
+    // [Parameter]
+    // public GoodsAuditResponse GoodsAudit { get; set; }
+
+    [Parameter]
+    public Dictionary<string, bool> Conditions {get;set;}
+
+    protected override void OnInitialized()
+    {
+    }
+}

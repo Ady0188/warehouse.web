@@ -1,0 +1,73 @@
+﻿<MudStack Row>
+    <MudSelect T="PeriodType" Label="Тип периода" Dense="true" Value="_type" ValueChanged="OnTypeChanged" Style="width:130px;">
+        <MudSelectItem Value="PeriodType.Month">Год и месяц</MudSelectItem>
+        <MudSelectItem Value="PeriodType.Range">Период</MudSelectItem>
+    </MudSelect>
+
+    @if (_type == PeriodType.Month)
+    {
+        <MonthPicker PastYears="_pastYears" ResetToToday=ResetToToday PeriodChanged="OnPeriodChanged" />
+    }
+    else
+    {
+        <MudDateRangePicker Label="Период" DateFormat="dd.MM.yyyy" PickerVariant="PickerVariant.Dialog" DateRange=@_dateRange DateRangeChanged="RangeChanged" Margin="Margin.Dense" />
+    }
+</MudStack>
+
+    @code {
+
+    [Parameter] public bool ResetToToday { get; set; }
+
+    [Parameter] public EventCallback<Period> PeriodChanged { get; set; }
+
+    private PeriodType _type = PeriodType.Month;
+    int _pastYears;
+
+    DateRange _dateRange { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (ResetToToday)
+        {
+            var to = DateTime.Now;
+            var from = new DateTime(to.Year, to.Month, 1);
+
+            _dateRange = new DateRange(from, to);
+        }
+    }
+
+    private async Task RangeChanged(DateRange range)
+    {
+        var period = new Period(range.Start.Value, range.End.Value);
+        
+        _dateRange = range;
+
+        if (PeriodChanged.HasDelegate)
+            await PeriodChanged.InvokeAsync(period);
+    }
+
+    private async Task OnPeriodChanged(Period period)
+    {
+        _dateRange = new DateRange(period.Start, period.End);
+
+        if (PeriodChanged.HasDelegate)
+            await PeriodChanged.InvokeAsync(period);
+    }
+
+    protected override void OnInitialized()
+    {
+        _pastYears = DateTime.Now.Year - 2025;
+    }
+
+    private async Task OnTypeChanged(PeriodType type)
+    {
+        _type = type;
+
+        var to = DateTime.Now;
+        var from = new DateTime(to.Year, to.Month, 1);
+
+        _pastYears = DateTime.Now.Year - 2025;
+
+        _dateRange = new DateRange(from, to);
+    }
+}

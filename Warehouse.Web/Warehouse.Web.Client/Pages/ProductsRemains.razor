@@ -1,0 +1,293 @@
+﻿@page "/productsremains"
+
+@inject HttpClient client
+@inject IJSRuntime JSRuntime
+
+@attribute [Authorize]
+
+<PageContent Title="Остатки товаров" @ref=pageContent FilterExpanded=@_filterExpanded OnApplyFilter="ApplyFilter" OnResetFilter="ResetFilter">
+    <ActionBar>
+        <MudButton Variant=@filterVariant Size="Size.Small" Color="Color.Info" StartIcon=@Icons.Material.Filled.FilterAlt OnClick=@(() => _filterExpanded = true)>Фильтр</MudButton>
+        <MudButton Variant=Variant.Outlined Size="Size.Small" Color="Color.Info" StartIcon=@Icons.Custom.FileFormats.FileExcel OnClick=@ExportToExcel>Экспорт в Excel</MudButton>
+    </ActionBar>
+    <FilterBar>
+        <MudStack Row>
+            <MudTextField @bind-Value=@filter.Name Label="Название" Clearable />
+            <MudTextField @bind-Value=@filter.Manufacturer Label="Производитель" Clearable />
+            <MudNumericField @bind-Value=@filter.SellPrice Label="Цена продажи" Clearable />
+        </MudStack>
+    </FilterBar>
+    <ChildContent>
+        <MudTable ServerData="ServerReload" Dense="true" Hover="true" Striped="true" @ref=table CustomHeader="true" HeaderClass="table-head-bordered" Bordered="true" RowStyleFunc="new Func<ProductResponse, int, string>(GetRowStyle)">
+            <HeaderContent>                
+                <AuthorizeView Roles="Admin" Context="cont">
+                    <MudTHeadRow Class="header-centered">
+                        <MudTh rowspan="2" Style="text-align:center;"><MudTableSortLabel SortLabel=@nameof(ProductResponse.Name) T="ProductResponse">Наименование</MudTableSortLabel></MudTh>
+                        <MudTh rowspan="2" Style="text-align:center;">Производитель</MudTh>
+                        <MudTh rowspan="2" Style="text-align:center;">Цена продажи</MudTh>
+                        <MudTh rowspan="2" Style="text-align:center;">Лимит</MudTh>
+
+                        <MudTh colspan="2" Style="text-align:center;">Все склады</MudTh>
+
+                        @foreach (var s in stores)
+                        {
+                            <MudTh colspan="2" Style="text-align:center;">@s.Value</MudTh>
+                        }
+                    </MudTHeadRow>
+                    <MudTHeadRow Class="header-centered">
+                        <MudTh Style="width: 120px;text-align:center;">Количество</MudTh>
+                        <MudTh Style="width: 120px;text-align:center;">Сумма</MudTh>
+
+                        @foreach (var s in stores)
+                        {
+                            <MudTh Style="width: 120px;text-align:center;">Количество</MudTh>
+                            <MudTh Style="width: 120px;text-align:center;">Сумма</MudTh>
+                        }
+                    </MudTHeadRow>
+                </AuthorizeView>
+                <AuthorizeView Roles="User" Context="cont">
+                    <MudTh rowspan="2" Style="text-align:center;"><MudTableSortLabel SortLabel=@nameof(ProductResponse.Name) T="ProductResponse">Наименование</MudTableSortLabel></MudTh>
+                    <MudTh rowspan="2" Style="text-align:center;">Производитель</MudTh>
+                    <MudTh rowspan="2" Style="text-align:center;">Цена продажи</MudTh>
+                    <MudTh rowspan="2" Style="text-align:center;">Лимит</MudTh>
+                    <MudTh Style="text-align:center;">Остаток</MudTh>
+                    <MudTh Style="text-align:center;">Сумма</MudTh>
+                    <MudTh Style="width: 100px;"></MudTh>
+                </AuthorizeView>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Manufacturer</MudTd>
+                <MudTd>@context.SellPrice</MudTd>
+                <MudTd>@context.LimitRemain</MudTd>
+
+                <AuthorizeView Roles="Admin" Context="cont">
+                    <MudTd><b>@context.StoresRemains.Sum(x => x.Value)</b></MudTd>
+                    <MudTd><b>@((context.StoresRemains.Sum(x => x.Value) * context.SellPrice).ToString("N2"))</b></MudTd>
+                    @foreach (var s in stores)
+                    {
+                        <MudTd>
+                            <MudStack Row AlignItems="AlignItems.Center">
+                                @context.StoresRemains.First(x => x.Key == s.Key).Value 
+                                <MudSpacer /> 
+                                <ActionButton Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Info" Tooltip="Оборот товара" OnClick=@(() => OpenTurnoverDialogAsync(context, s.Key)) />
+                            </MudStack>
+                        </MudTd>
+                        <MudTd>@((context.StoresRemains.First(x => x.Key == s.Key).Value * context.SellPrice).ToString("N2"))</MudTd>
+                    }
+                </AuthorizeView>
+
+                <AuthorizeView Roles="User" Context="cont">
+                    <MudTd>@context.StoresRemains.Sum(x => x.Value)</MudTd>
+                    <MudTd>@((context.StoresRemains.Sum(x => x.Value) * context.SellPrice).ToString("N2"))</MudTd>
+                    <MudTd>
+                        <ActionButton Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Info" Tooltip="Оборот товара" OnClick=@(() => OpenTurnoverDialogAsync(context, context.StoresRemains.First().Key)) />
+                    </MudTd>
+                </AuthorizeView>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Нет данных, соответствующих фильтру</MudText>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Загрузка...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+            </PagerContent>
+        </MudTable>
+    </ChildContent>
+</PageContent>
+
+@code {
+    bool IsLoading;
+    private MudTable<ProductResponse> table;
+
+    PageContent pageContent;
+    MudMessageBox _messageBox => pageContent.MessageBox;
+
+    PagedRequest pagedRequest = new();
+
+    DialogOptions dialogOptions => new() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false };
+
+    Dictionary<long, string> stores = new();
+
+    bool _filterExpanded = false;
+    FilterModel filter = new();
+    Variant filterVariant = Variant.Outlined;
+
+    private async Task ApplyFilter()
+    {
+        pagedRequest.Filter = filter.ToString();
+
+        await table.ReloadServerData();
+
+        _filterExpanded = false;
+        filterVariant = filter.IsEmpty ? Variant.Outlined : Variant.Filled;
+    }
+
+    private async Task ResetFilter()
+    {
+        filter = new();
+
+        await ApplyFilter();
+    }
+
+    object? GetValue(object obj, string propertyName, string? stringFormat = null)
+    {
+        var prop = obj.GetType().GetProperty(propertyName);
+        var value = prop?.GetValue(obj);
+
+        if (value is null)
+            return null;
+
+        if (!string.IsNullOrEmpty(stringFormat))
+        {
+            if (value is IFormattable formattable)
+                return formattable.ToString(stringFormat, null);
+        }
+
+        return value;
+    }
+
+    List<ColumnDefinition> Columns;
+
+    private string GetRowStyle(ProductResponse p, int row)
+    {
+        if (p.StoresRemains.Sum(x => x.Value) <= p.LimitRemain)
+            return "background-color:#ffebee; color:#d32f2f;";
+
+        return "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Columns = await LocalStorage.GetProductRemainsColumns();
+    }
+
+    private async Task OpenTurnoverDialogAsync(ProductResponse productResponse, long storeId)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<ProductTurnoverDialog>
+        {
+            { x => x.ProductId, productResponse.Id },
+            { x => x.StoreId, storeId }
+        };
+
+        await DialogService.ShowAsync<ProductTurnoverDialog>($"Оборот \"{productResponse.Name}\"", parameters, dialogOptions);
+    }
+
+    async Task ExportToExcel()
+    {
+        var response = await client.GetAsync($"{ApiEndpoints.V1.Products.ExportRemains}?{pagedRequest.ToQuery()}&incluedeRemains=true");
+
+        var contentDisposition = response.Content.Headers.ContentDisposition;
+
+        var fileName = contentDisposition?.FileNameStar ??
+                       contentDisposition?.FileName ??
+                       "template";
+
+        var fileBytes = await response.Content.ReadAsByteArrayAsync();
+        var fileContent = Convert.ToBase64String(fileBytes);
+        var url = $"data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{fileContent}";
+
+        await JSRuntime.InvokeVoidAsync("downloadFile", url, fileName);
+    }
+
+    private async Task<TableData<ProductResponse>> ServerReload(TableState state, CancellationToken token)
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        if (pagedRequest.ResetPage)
+        {
+            pagedRequest.ResetPage = false;
+
+            if (state.Page != 0)
+                table.NavigateTo(0);
+        }
+
+        pagedRequest.Refresh(state);
+
+        string content = string.Empty;
+        try
+        {
+            var response = await client.GetAsync($"{ApiEndpoints.V1.Products.GetAll}?{pagedRequest.ToQuery()}&incluedeRemains=true", token);
+            content = await response.Content.ReadAsStringAsync();
+
+            var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+            var result = await response.Content.ReadFromJsonAsync<ProductsResponse>(options);
+
+            if (response.IsSuccessStatusCode && result is not null)
+            {
+                stores = result.Stores.OrderBy(x => x.Value).ToDictionary();
+                
+                return new TableData<ProductResponse>
+                    {
+                        TotalItems = result.Total,
+                        Items = result.Items
+                    };
+            }
+        }
+        catch (JsonException ex)
+        {
+            if (ex.Message.StartsWith("'<' is an invalid start of a value"))
+            {
+                Nav.NavigateTo("/", forceLoad: true);
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+
+            StateHasChanged();
+        }
+
+        return await Task.FromResult(new TableData<ProductResponse>
+            {
+                Items = new List<ProductResponse>()
+            });
+
+    }
+
+    public class FilterModel
+    {
+        public string? Name { get; set; }
+        public string? Manufacturer { get; set; }
+        public string? Unit { get; set; }
+        public decimal? BuyPrice { get; set; }
+        public decimal? SellPrice { get; set; }
+        public int? Limit { get; set; }
+
+        public bool IsEmpty => string.IsNullOrEmpty(Name) &&
+                   string.IsNullOrEmpty(Manufacturer) &&
+                   string.IsNullOrEmpty(Unit) &&
+                   !BuyPrice.HasValue &&
+                   !SellPrice.HasValue &&
+                   !Limit.HasValue;
+
+        public override string ToString()
+        {
+            List<string> result = new List<string>();
+
+            if (!string.IsNullOrEmpty(Name))
+                result.Add($"(Name,{Name})");
+            if (!string.IsNullOrEmpty(Manufacturer))
+                result.Add($"(Manufacturer,{Manufacturer})");
+            if (!string.IsNullOrEmpty(Unit))
+                result.Add($"(Unit,{Unit})");
+            if (BuyPrice.HasValue)
+                result.Add($"(BuyPrice,{BuyPrice})");
+            if (SellPrice.HasValue)
+                result.Add($"(SellPrice,{SellPrice})");
+            if (Limit.HasValue)
+                result.Add($"(LimitRemain,{Limit})");
+
+            return string.Join("and", result);
+        }
+    }
+}

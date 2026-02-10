@@ -1,0 +1,204 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudGrid Style="padding: 0 0 10px 0;">
+            <MudItem xs="6">
+                <MudStack Row>
+                    <MudText>Пользователь:</MudText>
+                    <MudText>@History.UserName</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="6">
+                <MudStack Row>
+                    <MudText>Склад:</MudText>
+                    <MudText>@History.StoreName</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12">
+                @if (isUpdate)
+                {
+                    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+                        <MudTabPanel Text="Новые данные">
+                            <HistoryContentView Operation=newOperation
+                                                Agent=newAgent
+                                                Manager=newManager
+                                                StoreName=@GetName(History.ObjectStoreName, false)
+                                                ManagerName=@GetName(History.ObjectManagerName, false)
+                                                AgentName=@GetName(History.ObjectAgentName, false)
+                                                Product=newProduct
+                                                Order=newOrder
+                                                Store=newStore
+                                                User=newUser
+                                                Conditions=Conditions />
+                        </MudTabPanel>
+                        <MudTabPanel Text="Старые данные">
+                            <HistoryContentView Operation=oldOperation
+                                                Agent=oldAgent
+                                                Manager=oldManager
+                                                StoreName=@GetName(History.ObjectStoreName, true)
+                                                ManagerName=@GetName(History.ObjectManagerName, true)
+                                                AgentName=@GetName(History.ObjectAgentName, true)
+                                                Product=oldProduct
+                                                Order=oldOrder
+                                                Store=oldStore
+                                                User=oldUser
+                                                Conditions=Conditions />
+                        </MudTabPanel>
+                    </MudTabs>
+                }
+                else
+                {
+                    <MudCard>
+                        <MudCardContent>
+                            <HistoryContentView Operation=newOperation
+                                                Agent=newAgent
+                                                Manager=newManager
+                                                StoreName=@GetName(History.ObjectStoreName)
+                                                ManagerName=@GetName(History.ObjectManagerName)
+                                                AgentName=@GetName(History.ObjectAgentName)
+                                                Product=newProduct
+                                                Order=newOrder
+                                                Store=newStore
+                                                User=newUser
+                                                Conditions=Conditions />
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public HistoryResponse History { get; set; }
+
+    bool isUpdate => History.Method == "Update";
+
+    string GetName(string input, bool? isOld = null)
+    {
+        var splited = input.Split("|");
+
+        if (isOld is null || splited.Length != 2)
+            return input;
+        else if (isOld.Value)
+            return splited[0];
+
+        return splited[1];
+    }
+
+    OperationResponse? oldOperation;
+    OperationResponse? newOperation;
+    OrderResponse? oldOrder;
+    OrderResponse? newOrder;
+    AgentResponse? oldAgent;
+    AgentResponse? newAgent;
+    ManagerResponse? oldManager;
+    ManagerResponse? newManager;
+    UserResponse? oldUser;
+    UserResponse? newUser;
+    // GoodsAuditResponse? oldGoodsAudit;
+    // GoodsAuditResponse? newGoodsAudit;
+    StoreResponse? oldStore;
+    StoreResponse? newStore;
+    ProductResponse? oldProduct;
+    ProductResponse? newProduct;
+    // SendOrReceiveResponse? oldSendOrReceive;
+    // SendOrReceiveResponse? newSendOrReceive;
+
+    Dictionary<string, bool> Conditions = new();
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private (T? OldData, T? NewData) Deserialize<T>()
+    {
+        var oldObj = History.OldData is null ? default : JsonSerializer.Deserialize<T>(History.OldData);
+        var newObj = History.NewData is null ? default : JsonSerializer.Deserialize<T>(History.NewData);
+
+        return (oldObj, newObj);
+    }
+
+    protected override void OnInitialized()
+    {
+        var obdectName = History.ObjectName;
+
+        Conditions["operation"] = false;
+        Conditions["order"] = false;
+        Conditions["agent"] = false;
+        Conditions["manager"] = false;
+        Conditions["user"] = false;
+        Conditions["store"] = false;
+        Conditions["product"] = false;
+        Conditions["sendOrReceive"] = false;
+        Conditions["goodsAudit"] = false;
+
+        if (obdectName.EndsWith("Manager"))
+        {
+            Conditions["manager"] = true;
+            var res = Deserialize<ManagerResponse>();
+            oldManager = res.OldData;
+            newManager = res.NewData;
+        }
+        else if (obdectName.EndsWith("User"))
+        {
+            Conditions["user"] = true;
+            var res = Deserialize<UserResponse>();
+            oldUser = res.OldData;
+            newUser = res.NewData;
+        }
+        else if (obdectName.EndsWith("Store"))
+        {
+            Conditions["store"] = true;
+            var res = Deserialize<StoreResponse>();
+            oldStore = res.OldData;
+            newStore = res.NewData;
+        }
+        else if (obdectName.EndsWith("Agent"))
+        {
+            Conditions["agent"] = true;
+            var res = Deserialize<AgentResponse>();
+            oldAgent = res.OldData;
+            newAgent = res.NewData;
+        }
+        else if (obdectName.EndsWith("Product"))
+        {
+            Conditions["product"] = true;
+            var res = Deserialize<ProductResponse>();
+            oldProduct = res.OldData;
+            newProduct = res.NewData;
+        }
+        else if (obdectName.EndsWith("Operation"))
+        {
+            Conditions["operation"] = true;
+            var res = Deserialize<HistoryOperationResponse>();
+            oldOperation = res.OldData?.Get();
+            newOperation = res.NewData?.Get();
+        }
+        else if (obdectName.EndsWith("Order"))
+        {
+            Conditions["order"] = true;
+            var res = Deserialize<OrderResponse>();
+            oldOrder = res.OldData;
+            newOrder = res.NewData;
+        }
+        // else if (obdectName.EndsWith("SendOrReceive"))
+        // {
+        //     Conditions["sendOrReceive"] = true;
+        //     var res = Deserialize<SendOrReceiveResponse>();
+        //     oldSendOrReceive = res.OldData;
+        //     newSendOrReceive = res.NewData;
+        // }
+        // else if (obdectName.EndsWith("GoodsAudit"))
+        // {
+        //     Conditions["goodsAudit"] = true;
+        //     var res = Deserialize<GoodsAuditResponse>();
+        //     oldGoodsAudit = res.OldData;
+        //     newGoodsAudit = res.NewData;
+        // }
+    }
+}

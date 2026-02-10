@@ -1,0 +1,80 @@
+﻿@inject IDialogService DialogService
+
+<MudTextField @ref="TextField"
+              ReadOnly="true"
+              Value="@DisplayValue"
+              Label="@Label"
+              Placeholder="@Placeholder"
+              Adornment="Adornment.End"
+              Disabled=@Disabled
+              AdornmentIcon="@Icons.Material.Filled.Event"
+              OnAdornmentClick="OpenDialog"
+              @onclick="OpenDialog"
+              Class="@Class" />
+
+@code {
+    [Parameter] public DateTime Value { get; set; } = DateTime.Now;
+    [Parameter] public EventCallback<DateTime> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "Дата и время";
+    [Parameter] public string Placeholder { get; set; } = "Выберите дату и время";
+    [Parameter] public string Class { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public DateTime? MinDate { get; set; }
+    [Parameter] public DateTime? MaxDate { get; set; }
+    [Parameter] public string DisplayFormat { get; set; } = "dd.MM.yyyy HH:mm";
+
+    private MudTextField<string> TextField;
+    private string DisplayValue => Value.ToString(DisplayFormat);
+
+    private async Task OpenDialog()
+    {
+        var parameters = new DialogParameters {
+            { "InitialValue", Value },
+            { "MinDate", MinDate },
+            { "MaxDate", MaxDate },
+            { "DisplayFormat", DisplayFormat }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, BackdropClick = false, MaxWidth = MaxWidth.Small };
+
+        var dialog = DialogService.Show<MudDateTimeDialog>("Выберите дату и время", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is DateTime dt)
+        {
+            Value = dt;
+            await ValueChanged.InvokeAsync(Value);
+        }
+    }
+}
+
+
+@* <MudStack Spacing="2">
+    <MudDatePicker Label=@Label @bind-Date=@DatePart DateFormat="dd.MM.yyyy" />
+    <MudTimePicker @bind-Time="TimePart" Label="Выберите время" />
+</MudStack>
+
+@code {
+    [Parameter] public DateTime Value { get; set; } = DateTime.Now;
+    [Parameter] public EventCallback<DateTime> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "Выберите дату и время";+
+
+    private DateTime? DatePart
+    {
+        get => Value.Date;
+        set
+        {
+            Value = value!.Value.Date + Value.TimeOfDay;
+            ValueChanged.InvokeAsync(Value);
+        }
+    }
+
+    private TimeSpan? TimePart
+    {
+        get => Value.TimeOfDay;
+        set
+        {
+            Value = Value.Date + value!.Value;
+            ValueChanged.InvokeAsync(Value);
+        }
+    }
+} *@

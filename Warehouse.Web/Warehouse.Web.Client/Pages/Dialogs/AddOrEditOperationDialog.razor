@@ -1,0 +1,392 @@
+﻿@using System.Text.Json
+@using System.Text
+
+@inject HttpClient client
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form">
+            <MudGrid Style="padding: 0 0 10px 0;">
+                <MudItem xs="12">
+                    <MudStack Row="true" AlignItems="AlignItems.End" Justify="Justify.FlexStart">
+                        <MudText Inline>@Title</MudText>
+                        <MudStack Style="width:175px;">
+                            <MudDateTimePicker Label="От" @bind-Value=@date MinDate=@(new DateTime(2025, 10, 1)) MaxDate=@(DateTime.Now) />
+                        </MudStack>
+                        <MudSelect T="long?" @bind-Value="storeId" Label="Склад" Required="true" Clearable Style="width:130px;" Disabled=@(OperationType == OperationType.Receive)>
+                            @foreach (var store in _stores)
+                            {
+                                <MudSelectItem T="long?" Value="store.Key">@store.Value</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        @if (OperationType == OperationType.Send || OperationType == OperationType.Receive)
+                        {
+                            <MudSelect T="long?" @bind-Value="toStoreId" Label="Склад" Required="true" Clearable Style="width:130px;" Disabled=@(OperationType == OperationType.Receive)>
+                                @foreach (var store in _toStores)
+                                {
+                                    <MudSelectItem T="long?" Value="store.Key">@store.Value</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                        else
+                        {
+                            <MyMudSelect TItem="long" @bind-Value="agentId" Label="Контрагент" Items=@_agents.ToDictionary(x => x.Id, x => x.Name) Searchable />
+                            
+                            @* <MudSelect T="long?" @bind-Value="agentId" Label="Контрагент" Required="true" Clearable Style="width:300px;">
+                                @foreach (var agent in _agents)
+                                {
+                                    <MudSelectItem T="long?" Value="agent.Id">@agent.Name</MudSelectItem>
+                                }
+                            </MudSelect> *@
+                            <MudNumericField T="decimal" @bind-Value=@discountPercentage Label="Скидка" Required="true" Style="width:100px;" />
+                        }
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTable T="OperationProductRequest" Items="@productsRequest" TotalItems=@productsRequest.Count() Hover="true" Dense>
+                        <HeaderContent>
+                            <MudTh>Наименование</MudTh>
+                            <MudTh Style="width:150px;">Количество</MudTh>
+                            <MudTh Style="width:150px;">Цена</MudTh>
+                            <MudTh Style="width:150px;">Сумма</MudTh>
+                            <MudTh Style="width:100px;text-align:center;">
+                                @if (OperationType == OperationType.Send || OperationType == OperationType.Receive)
+                                {
+                                    <ActionButton Icon="@Icons.Material.Filled.Add" Color="Color.Secondary" Tooltip="Добавить" OnClick=@OnChoose Disabled=@(!storeId.HasValue || !toStoreId.HasValue || OperationType == OperationType.Receive) />
+                                }
+                                else
+                                {
+                                    <ActionButton Icon="@Icons.Material.Filled.Add" Color="Color.Secondary" Tooltip="Добавить" OnClick=@OnChoose Disabled=@(!storeId.HasValue || !agentId.HasValue) />
+                                }
+                            </MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Name">@context.Name</MudTd>
+                            <MudTd DataLabel="Quantity">@context.Quantity</MudTd>
+                            <MudTd DataLabel="Price">@context.Price</MudTd>
+                            <MudTd>@(context.Quantity * context.Price)</MudTd>
+                            <AuthorizeView Roles="User" Context="cont">
+                                <MudTd>
+                                    <MudStack Row=true AlignItems=AlignItems.Center Style="width: 100%;">
+                                        <ActionButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Tooltip="Редактировать" OnClick=@(() => OnEdit(context)) Disabled=@(OperationType == OperationType.Receive) />
+                                        <ActionButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Tooltip="Удалить" OnClick=@(() => OnDelete(context)) Disabled=@(OperationType == OperationType.Receive) />
+                                    </MudStack>
+                                </MudTd>
+                            </AuthorizeView>
+                        </RowTemplate>
+                        <FooterContent>
+                            <MudTh></MudTh>
+                            <MudTh>@(productsRequest.Sum(x => x.Quantity))</MudTh>
+                            <MudTh></MudTh>
+                            <MudTh>@(productsRequest.Sum(x => x.Quantity * x.Price))</MudTh>
+                            <MudTh></MudTh>
+                        </FooterContent>
+
+                        <NoRecordsContent>
+                            <MudText>Нет данных, соответствующих фильтру</MudText>
+                        </NoRecordsContent>
+                        <LoadingContent>
+                            <MudText>Загрузка...</MudText>
+                        </LoadingContent>
+                        <PagerContent>
+                            <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+                        </PagerContent>
+                    </MudTable>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@comment Label="Коментария" Lines="4" Clearable />
+                </MudItem>
+                @if (OperationType != OperationType.Send && OperationType != OperationType.Receive)
+                {
+                    <MudItem xs="4">
+                        <MudStack AlignItems="AlignItems.End" Spacing="1">
+                            <MudText>Сумма:</MudText>
+                            <MudText>Скидка:</MudText>
+                            <MudText>Итого:</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="2">
+                        <MudStack AlignItems="AlignItems.End" Spacing="1">
+                            <MudText>@amount.ToString("N2")</MudText>
+                            <MudText>@discount.ToString("N2")</MudText>
+                            <MudText>@((amount - discount).ToString("N2"))</MudText>
+                        </MudStack>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+        @if (OperationType == OperationType.Send || OperationType == OperationType.Receive)
+        {
+            <MudButton Color="Color.Primary" OnClick="Submit" Disabled=@(!storeId.HasValue || !toStoreId.HasValue || productsRequest.Count() == 0)>Сохранить</MudButton>
+        }
+        else
+        {
+            <MudButton Color="Color.Primary" OnClick="Submit" Disabled=@(!storeId.HasValue || !agentId.HasValue || productsRequest.Count() == 0)>Сохранить</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public string Title { get; set; }
+
+    [Parameter]
+    public OperationResponse Operation { get; set; } = new();
+
+    [Parameter]
+    public bool IsEdit { get; set; }
+
+    [Parameter]
+    public Dictionary<long, string> Stores { get; set; }
+
+    [Parameter]
+    public Dictionary<long, string> ToStores { get; set; }
+
+    Dictionary<long, string> _stores => OperationType == OperationType.Receive ? ToStores : Stores;
+
+    Dictionary<long, string> _toStores => storeId.HasValue && OperationType != OperationType.Receive ? ToStores.Where(x => x.Key != storeId.Value).ToDictionary(x => x.Key, x => x.Value) : (OperationType == OperationType.Receive ? ToStores : new Dictionary<long, string>());
+
+    [Parameter]
+    public List<AgentResponse> Agents { get; set; }
+
+    List<AgentResponse> _agents => storeId.HasValue ? (Agents.Where(x => x.StoreId == storeId.Value).ToList() ?? new List<AgentResponse>()) : new List<AgentResponse>();
+    Dictionary<long, string> _agents1 => storeId.HasValue ? (Agents.Where(x => x.StoreId == storeId.Value).ToDictionary(x => x.Id, x => x.Name) ?? new Dictionary<long, string>()) : new Dictionary<long, string>();
+
+    [Parameter]
+    public List<ProductResponse> Products { get; set; }
+
+    public List<ProductResponse> _productsList { get; set; }
+
+    [Parameter]
+    public OperationType OperationType { get; set; }
+
+    bool isBuy => OperationType != OperationType.Send && OperationType != OperationType.ReturnsToSuplier && OperationType != OperationType.Shipments;
+
+    private MudForm form;
+
+    DateTime date = DateTime.Now;
+    decimal discountPercentage;
+    decimal amount => productsRequest.Sum(x => x.Quantity * x.Price);
+    decimal discount => amount * discountPercentage / 100m;
+    long? storeId;
+    long? toStoreId;
+    long? agentId;
+    string? comment;
+    long? parentId;
+
+    List<OperationProductRequest> productsRequest = new();
+
+    async Task OnDelete(OperationProductRequest product)
+    {
+        productsRequest.Remove(product);
+    }
+
+    DialogOptions dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseButton = true };
+    DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+
+    async Task OnEdit(OperationProductRequest product)
+    {
+        var _products = _productsList.Where(p => product.ProductId == p.Id).ToList();
+
+        var parameters = new DialogParameters<ChooseProductDialog>
+        {
+            { x => x.Products, _products },
+            { x => x.Product, product },
+            { x => x.StoreId, storeId!.Value },
+            { x => x.IsBuy, isBuy },
+            { x => x.IsEdit, true }
+        };
+
+        var dialog = await DialogService.ShowAsync<ChooseProductDialog>("Добавить", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            // productsRequest.Add(new OperationProductRequest
+            //     {
+            //         BuyPrice = product.BuyPrice,
+            //         Code = product.Code,
+            //         Manufacturer = product.Manufacturer,
+            //         Name = product.Name,
+            //         Price = product.Price,
+            //         ProductId = product.ProductId,
+            //         Quantity = product.Quantity,
+            //         SellPrice = product.SellPrice,
+            //         Unit = product.Unit
+            //     });
+
+            StateHasChanged();
+        }
+    }
+
+    async Task OnChoose()
+    {
+        var product = new OperationProductRequest();
+        var _products = _productsList.Where(p => !productsRequest.Any(pr => pr.ProductId == p.Id)).ToList();
+
+        if (_products.Count == 0)
+            return;
+
+        // var notAvalable = _products.All(x => x.StoresRemains.ContainsKey(storeId!.Value) && x.StoresRemains[storeId!.Value] <= 0);
+
+        // if (notAvalable)
+        //     return;
+
+        var parameters = new DialogParameters<ChooseProductDialog>
+        {
+            { x => x.Products, _products },
+            { x => x.StoreId, storeId!.Value },
+            { x => x.IsBuy, isBuy },
+            { x => x.Product, product }
+        };
+
+        var dialog = await DialogService.ShowAsync<ChooseProductDialog>("Добавить", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            productsRequest.Add(new OperationProductRequest
+                {
+                    BuyPrice = product.BuyPrice,
+                    Code = product.Code,
+                    Manufacturer = product.Manufacturer,
+                    Name = product.Name,
+                    Price = product.Price,
+                    ProductId = product.ProductId,
+                    Quantity = product.Quantity,
+                    SellPrice = product.SellPrice,
+                    Unit = product.Unit
+                });
+
+            StateHasChanged();
+
+            await Task.Delay(500);
+            OnChoose();
+        }
+    }
+
+    private async Task Submit()
+    {
+        await form.Validate();
+
+        if (!form.IsValid)
+        {
+            return;
+        }
+
+        bool isSubmitSuccess = false;
+        var receiverId = toStoreId.HasValue ? toStoreId.Value : (agentId.HasValue ? agentId.Value : 0);
+
+        if (OperationType == OperationType.Receive)
+            parentId = Operation.Id;
+
+        if (IsEdit)
+        {
+            var updateRequest = new UpdateOperationRequest(date.ToString("ddMMyyyyHHmm"), amount, discountPercentage, (int)OperationType, parentId ?? 0, storeId!.Value, receiverId, comment, productsRequest);
+
+            var response = await client.PutAsync($"{ApiEndpoints.V1.Operations.Create}/{Operation.Id}", updateRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+        else
+        {
+            var addRequest = new CreateOperationRequest(date.ToString("ddMMyyyyHHmm"), amount, discountPercentage, (int)OperationType, storeId!.Value, receiverId, comment, productsRequest);
+
+            var response = await client.PostAsync(ApiEndpoints.V1.Operations.Create, addRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Reset()
+    {
+        date = DateTime.Now;
+        storeId = default;
+        agentId = default;
+        discountPercentage = default;
+        comment = default;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _productsList = Products.Clone();
+
+        if (IsEdit)
+        {
+            date = Operation.Date;
+            storeId = Operation.StoreId;
+            if (Operation.ToStoreId != 0)
+            {
+                toStoreId = Operation.ToStoreId;
+            }
+            agentId = Operation.AgentId;
+            discountPercentage = Operation.DiscountPercentage;
+            comment = Operation.Comment;
+
+            if (OperationType != OperationType.Receive)
+            {
+                var remainsResponse = await client.GetAsync($"{ApiEndpoints.V1.Reports.Remains}?dateTime={date.ToString("ddMMyyyyHHmmss")}");
+                var remainsResult = await remainsResponse.Content.ReadFromJsonAsync<RemainsesResponse>();
+
+                var thisStoreRemains = remainsResult!.StoreRemains.FirstOrDefault(x => x.Key == storeId).Value;
+
+                foreach (var item in _productsList)
+                {
+                    var remains = thisStoreRemains.FirstOrDefault(x => x.ProductId == item.Id);
+
+                    if (remains is null)
+                        continue;
+
+                    item.StoresRemains[storeId.Value] = remains.Count;
+                }
+            }
+
+            productsRequest = Operation.Products.Select(x => new OperationProductRequest
+                {
+                    BuyPrice = x.BuyPrice,
+                    Manufacturer = x.Manufacturer,
+                    Name = x.ProductName,
+                    Price = x.Price,
+                    ProductId = x.ProductId,
+                    Quantity = x.Quantity,
+                    SellPrice = x.SellPrice,
+                    Unit = x.Unit
+                }).ToList();
+        }
+        else
+        {
+            Reset();
+        }
+
+        if (Stores.Count() == 1 && OperationType != OperationType.Receive)
+            storeId = Stores.First().Key;
+    }
+}

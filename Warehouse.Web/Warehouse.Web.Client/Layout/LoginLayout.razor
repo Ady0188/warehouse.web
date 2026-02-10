@@ -1,0 +1,42 @@
+﻿@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="CustomTheme" />
+
+<MudLayout>
+    <MudMainContent Class="mt-16 pa-4">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+
+    private MudTheme CustomTheme = ThemeStorage.GetTheme(0);
+
+    private AppSettings _appSettings = new AppSettings();
+
+    protected override async Task OnAfterRenderAsync(bool isFirstRender)
+    {
+        if (isFirstRender)
+        {
+            _appSettings = await GetSettings();
+
+            CustomTheme = ThemeStorage.GetTheme(_appSettings.ThemeIndex);
+            StateHasChanged();
+        }
+    }
+
+    private async Task<AppSettings> GetSettings()
+    {
+        var settings = await LocalStorage.GetItemAsStringAsync("appSettings");
+
+        if (!string.IsNullOrEmpty(settings))
+        {
+            var json = System.Text.Json.JsonSerializer.Deserialize<string>(settings)!;
+            return System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json)!;
+        }
+
+        return new AppSettings();
+    }
+}
+
+

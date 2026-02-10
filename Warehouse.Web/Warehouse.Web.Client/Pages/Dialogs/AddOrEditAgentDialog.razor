@@ -1,0 +1,161 @@
+﻿@using System.Text.Json
+@using System.Text
+@inject HttpClient client
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form">
+            <MudGrid Style="padding: 0 0 10px 0;">
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@name Label="Наименования" Required="true" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@phone Label="Номер телефона" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@address Label="Адрес" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudSelect T="long?" @bind-Value="storeId" Label="Склад" Required="true" Clearable>
+                        @foreach (var store in _stores)
+                        {
+                            <MudSelectItem T="long?" Value="store.Key">@store.Value</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudSelect T="long?" @bind-Value="managerId" Label="Менеджер" Required="true" Clearable>
+                        @foreach (var manager in _managers)
+                        {
+                            <MudSelectItem T="long?" Value="manager.Key">@manager.Value</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@comment Label="Коментария" Clearable />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="Reset">Сбросить</MudButton>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Сохранить</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public AgentResponse Agent { get; set; }
+
+    [Parameter]
+    public List<StoreResponse> Stores { get; set; }
+
+    public Dictionary<long, string> _stores => Stores.ToDictionary(x => x.Id, x => x.Name) ?? new Dictionary<long, string>();
+
+    public Dictionary<long, string> _managers => storeId.HasValue ? 
+        (Stores.First(x => x.Id == storeId.Value).Managers.ToDictionary(x => x.Id, x => x.Lastname) ?? new Dictionary<long, string>()) : 
+        new Dictionary<long, string>();
+
+    [Parameter]
+    public bool IsEdit { get; set; }
+
+    private MudForm form;
+
+    string? name;
+    string? address;
+    string? phone;
+    long? storeId;
+    long? managerId;
+    string? comment;
+
+    private async Task Submit()
+    {
+        await form.Validate();
+
+        if (!form.IsValid)
+        {
+            return;
+        }
+
+        var store = _stores.First(s => s.Key == storeId);
+        var manager = _managers.First(s => s.Key == managerId);
+
+        bool isSubmitSuccess = false;
+        if (IsEdit)
+        {
+            var updateRequest = new UpdateAgentRequest(name, phone, address, store.Key, store.Value, manager.Key, manager.Value, comment);
+
+            var response = await client.PutAsync($"{ApiEndpoints.V1.Agents.Create}/{Agent.Id}", updateRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+        else
+        {
+            var addRequest = new CreateAgentRequest(name, phone, address, store.Key, store.Value, manager.Key, manager.Value, comment);
+
+            var response = await client.PostAsync(ApiEndpoints.V1.Agents.Create, addRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Reset()
+    {
+        name = default;
+        storeId = default;
+        address = default;
+        phone = default;
+        managerId = default;
+        comment = default;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit)
+        {
+            name = Agent.Name;
+            storeId = Agent.StoreId;
+            address = Agent.Address;
+            phone = Agent.Phone;
+            managerId = Agent.ManagerId;
+            comment = Agent.Comment;
+        }
+        else
+        {
+            Reset();
+        }
+
+        if (_stores.Count == 1)
+        {
+            storeId = _stores.First().Key;
+        }
+
+        if (_managers.Count == 1)
+        {
+            managerId = _managers.First().Key;
+        }
+    }
+}

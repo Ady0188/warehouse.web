@@ -1,0 +1,99 @@
+﻿@using System.Text.Json
+@using System.Text
+@inject HttpClient client
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form">
+            <MudGrid Style="padding: 0 0 10px 0;">
+                <MudItem xs="12">
+                    <MudTextField T="string" @bind-Value=@name Label="Название" Required="true" Clearable />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="Reset">Сбросить</MudButton>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Сохранить</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public StoreResponse Store { get; set; }
+
+    [Parameter]
+    public bool IsEdit { get; set; }
+
+    private MudForm form;
+
+    string? name;
+
+    private async Task Submit()
+    {
+        await form.Validate();
+
+        if (!form.IsValid)
+        {
+            return;
+        }
+
+        bool isSubmitSuccess = false;
+        if (IsEdit)
+        {
+            var updateRequest = new UpdateStoreRequest(name);
+
+            var response = await client.PutAsync($"{ApiEndpoints.V1.Stores.Create}/{Store.Id}", updateRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+        else
+        {
+            var addRequest = new CreateStoreRequest(name);
+
+            var response = await client.PostAsync(ApiEndpoints.V1.Stores.Create, addRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Reset()
+    {
+        name = default;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit)
+        {
+            name = Store.Name;
+        }
+        else
+        {
+            name = default;
+        }
+    }
+}

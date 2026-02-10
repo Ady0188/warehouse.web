@@ -1,0 +1,160 @@
+﻿@implements IDisposable
+
+@inject NavigationManager NavigationManager
+
+@* <MudNavMenu>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Главная</MudNavLink>
+
+    <MudNavGroup Title="Справочники" Icon="@Icons.Material.Filled.MenuBook">
+        <AuthorizeView Roles="Admin">
+            <MudNavLink Href="stores" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Склады</MudNavLink>
+            <MudNavLink Href="employees" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Сотрудники</MudNavLink>
+        </AuthorizeView>
+        <MudNavLink Href="managers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Менеджеры</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavLink Href="agents" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Контрагенты</MudNavLink>
+
+    <MudNavGroup Title="Товары" Icon="@Icons.Material.Filled.Category">
+        <MudNavLink Href="products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Список</MudNavLink>
+        <MudNavLink Href="productsremains" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Остатки</MudNavLink>
+
+        <MudNavGroup Title="Перемещения" Icon="@Icons.Material.Filled.FiberManualRecord">
+            <MudNavLink Href="operations/send" Match="NavLinkMatch.Prefix">Отправка</MudNavLink>
+            <MudNavLink Href="operations/receive" Match="NavLinkMatch.Prefix">Получение</MudNavLink>
+        </MudNavGroup>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Ревизии" Icon="@Icons.Material.Filled.FactCheck">
+        <MudNavLink Href="audit/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Товары</MudNavLink>
+        <MudNavLink Href="audit/agents" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Контрагенты</MudNavLink>
+    </MudNavGroup>
+
+    <AuthorizeView Roles="Admin">
+        <MudNavGroup Title="Закупки" Icon="@Icons.Material.Filled.ShoppingCart">
+            <MudNavLink Href="operations/receiving" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Приемки</MudNavLink>
+            <MudNavLink Href="operations/returntosuplier" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Возвраты поставщикам</MudNavLink>
+        </MudNavGroup>
+    </AuthorizeView>
+
+    <MudNavGroup Title="Продажа" Icon="@Icons.Material.Filled.ShoppingCartCheckout">
+        <MudNavLink Href="operations/shipments" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Отгрузки</MudNavLink>
+        <MudNavLink Href="operations/buyerreturn" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Возвраты покупателей</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Финансы" Icon="@Icons.Material.Filled.AccountBalanceWallet">
+        <MudNavLink Href="orders/receipts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Приходный ордер</MudNavLink>
+        <MudNavLink Href="orders/outgoings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Расходный ордер</MudNavLink>
+        <MudNavLink Href="debts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FiberManualRecord">Долги</MudNavLink>
+    </MudNavGroup>
+
+    <AuthorizeView Roles="Admin">
+        <MudNavLink Href="history" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.RecentActors">Журнал действий</MudNavLink>
+    </AuthorizeView>
+
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="Account/Manage" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">@context.User.Identity?.Name</MudNavLink>
+            
+            <form action="Account/Logout" method="post">
+                <AntiforgeryToken />
+                <input type="hidden" name="returnUrl" value="@currentUrl" />
+                <button type="submit" class="mud-nav-link mud-ripple">
+                    <MudIcon Icon="@Icons.Material.Filled.Logout" Color="Color.Info" Class="mr-3"></MudIcon> Logout
+                </button>
+            </form>
+
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu> *@
+
+<MudNavMenu>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Главная</MudNavLink>
+
+    <MudNavGroup Title="Справочники" Icon="@Icons.Material.Filled.MenuBook">
+        <AuthorizeView Roles="Admin">
+            <MudNavLink Href="stores" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Store">Склады</MudNavLink>
+            <MudNavLink Href="employees" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Badge">Сотрудники</MudNavLink>
+        </AuthorizeView>
+        <MudNavLink Href="managers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SupervisorAccount">Менеджеры</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavLink Href="agents" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Groups">Контрагенты</MudNavLink>
+
+    <MudNavGroup Title="Товары" Icon="@Icons.Material.Filled.Category">
+        <MudNavLink Href="products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory">Список</MudNavLink>
+        <MudNavLink Href="productsremains" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment">Остатки</MudNavLink>
+
+        <MudNavGroup Title="Перемещения" Icon="@Icons.Material.Filled.CompareArrows">
+            <MudNavLink Href="operations/send" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallMade">Отправка</MudNavLink>
+            <MudNavLink Href="operations/receive" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallReceived">Получение</MudNavLink>
+        </MudNavGroup>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Ревизии" Icon="@Icons.Material.Filled.FactCheck">
+        <MudNavLink Href="audit/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory2">Товары</MudNavLink>
+        <MudNavLink Href="audit/agents" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FindInPage">Контрагенты</MudNavLink>
+    </MudNavGroup>
+
+    <AuthorizeView Roles="Admin,Main">
+        <MudNavGroup Title="Закупки" Icon="@Icons.Material.Filled.ShoppingCart">
+            <MudNavLink Href="operations/receiving" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ReceiptLong">Приемки</MudNavLink>
+            <MudNavLink Href="operations/returntosuplier" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AssignmentReturn">Возвраты поставщикам</MudNavLink>
+        </MudNavGroup>
+    </AuthorizeView>
+
+    <MudNavGroup Title="Продажа" Icon="@Icons.Material.Filled.ShoppingCartCheckout">
+        <MudNavLink Href="operations/shipments" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Отгрузки</MudNavLink>
+        <MudNavLink Href="operations/buyerreturn" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Undo">Возвраты покупателей</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Финансы" Icon="@Icons.Material.Filled.AccountBalanceWallet">
+        <MudNavLink Href="orders/receipts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallReceived">Приходный ордер</MudNavLink>
+        <MudNavLink Href="orders/outgoings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallMade">Расходный ордер</MudNavLink>
+        <MudNavLink Href="debts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MoneyOff">Долги</MudNavLink>
+    </MudNavGroup>
+
+    <AuthorizeView Roles="Admin">
+        <MudNavLink Href="history" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">Журнал действий</MudNavLink>
+    </AuthorizeView>
+
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="Account/Manage" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">
+                @context.User.Identity?.Name
+            </MudNavLink>
+
+            <form action="Account/Logout" method="post">
+                <AntiforgeryToken />
+                <input type="hidden" name="returnUrl" value="@currentUrl" />
+                <button type="submit" class="mud-nav-link mud-ripple">
+                    <MudIcon Icon="@Icons.Material.Filled.Logout" Class="mr-3" /> Выход
+                </button>
+            </form>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>
+
+
+@code {
+    private string? currentUrl;
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}
+
+

@@ -1,0 +1,387 @@
+﻿@page "/orders/{kind}"
+
+@inject HttpClient client
+@inject IJSRuntime JSRuntime
+
+@attribute [Authorize(Roles = "Admin,User")]
+
+<PageContent Title=@Title @ref=pageContent FilterExpanded=@_filterExpanded OnApplyFilter="ApplyFilter" OnResetFilter="ResetFilter">
+    <ActionBar>
+        <MudButton Variant=@filterVariant Size="Size.Small" Color="Color.Info" StartIcon=@Icons.Material.Filled.FilterAlt OnClick=@(() => _filterExpanded = true)>Фильтр</MudButton>
+        <MudButton Variant=Variant.Outlined Size="Size.Small" Color="Color.Info" StartIcon=@Icons.Custom.FileFormats.FileExcel OnClick=@ExportToExcel Disabled=!canExport>Экспорт в Excel</MudButton>
+        <AuthorizeView Roles="User">
+            <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" StartIcon=@Icons.Material.Filled.Add OnClick="OpenAddDialogAsync">Добавить</MudButton>
+        </AuthorizeView>
+    </ActionBar>
+    <FilterBar>
+        <MudGrid Style="padding: 0 0 10px 0;">
+            <MudItem xs="1">
+                <MudNumericField @bind-Value=@filter.Code Label="Код" Clearable />
+            </MudItem>
+            <MudItem xs="3">
+                <MonthPicker PastYears="pastYears" PeriodChanged="OnPeriodChanged" ResetToToday=_resetToToday />
+            </MudItem>
+            <MudItem xs="2">
+                <MyMudSelect TItem="long" @bind-Value=@filter.StoreId Label="Склад" Items=@stores Clearable Dense />
+            </MudItem>
+            <MudItem xs="3">
+                <MyMudSelect TItem="long" @bind-Value=@filter.ManagerId Label="Менеджер" Items=@_managers Clearable Dense />
+            </MudItem>
+            <MudItem xs="3">
+                <MyMudSelect TItem="long" @bind-Value=@filter.AgentId Label="Контрагент" Items=@_agents Searchable Clearable Dense />
+            </MudItem>
+        </MudGrid>
+    </FilterBar>
+    <ChildContent>
+        <MudTable ServerData="ServerReload" Dense="true" Hover="true" Striped="true" @ref=table>
+            <HeaderContent>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    <MudTh><MudTableSortLabel SortLabel=@col.PropertyName T="OrderResponse" Style=@col.Style>@col.Title</MudTableSortLabel></MudTh>
+                }
+                <MudTh Style="width: 100px;"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    @if(col.PropertyName == "Code")
+                    {
+                        <MudTd>@(context.Code.ToString().PadLeft(7, '0'))</MudTd>
+                    }
+                    else
+                    {
+                        <MudTd>@GetValue(context, col.PropertyName, col.StringFormat)</MudTd>
+                    }
+                }
+                <MudTd>
+                    <MudStack Row=true AlignItems=AlignItems.Center Style="width: 100%;">
+                        <ActionButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Tooltip="Редактировать" OnClick=@(() => OpenEditDialogAsync(context)) />
+                        <ActionButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Tooltip="Удалить" OnClick=@(() => OnDeleteAsync(context)) />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <FooterContent>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    if (col.PropertyName == nameof(OrderResponse.Amount))
+                    {
+                        <MudTh>@Math.Round(totalAmount, 2)</MudTh>
+                    }
+                    else
+                    {
+                        <MudTh></MudTh>
+                    }
+                }
+                <MudTh Style="width: 100px;"></MudTh>
+            </FooterContent>
+            <NoRecordsContent>
+                <MudText>Нет данных, соответствующих фильтру</MudText>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Загрузка...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+            </PagerContent>
+        </MudTable>
+    </ChildContent>
+</PageContent>
+
+
+@code {
+    [Parameter] public string? kind { get; set; }
+    private bool IsReceipts => string.Equals(kind, "receipts", StringComparison.OrdinalIgnoreCase);
+    private string Title => IsReceipts ? "Приходный ордер" : "Расходный ордер";
+
+    int type => IsReceipts ? 0 : 1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (table is not null && (IsReceipts || string.Equals(kind, "outgoings", StringComparison.OrdinalIgnoreCase)))
+            await ResetFilter();
+    }
+
+    private string _buttonText = "ФИО";
+    bool IsLoading;
+    private MudTable<OrderResponse> table;
+
+    bool canExport;
+
+    PageContent pageContent;
+    MudMessageBox _messageBox => pageContent.MessageBox;
+
+    List<StoreResponse> storeList = new();
+    Dictionary<long, string> stores = new();
+    List<ManagerResponse> managers = new();
+    List<AgentResponse> agents = new();
+
+    decimal totalAmount;
+
+    Dictionary<long, string> _managers => filter.StoreId.HasValue ? storeList.First(x => x.Id == filter.StoreId.Value).Managers.ToDictionary(x => x.Id, x => $"{x.Lastname} {x.Firstname}".Trim()) : new Dictionary<long, string>();
+    Dictionary<long, string> _agents => filter.ManagerId.HasValue ? agents.Where(x => x.ManagerId == filter.ManagerId.Value).ToDictionary(x => x.Id, x => x.Name) : new Dictionary<long, string>();
+
+    DialogOptions dialogOptions => new() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false };
+
+    bool _filterExpanded = false;
+    FilterModel filter = new();
+    Variant filterVariant = Variant.Outlined;
+    private DateRange _dateRange { get; set; }
+    string filterString = string.Empty;
+
+    int pastYears;
+
+    private async Task OnPeriodChanged(Period period)
+    {
+        filter.DateRange = new DateRange(period.Start, period.End);
+    }
+
+    private async Task ApplyFilter()
+    {
+        filterString = filter.ToString();
+
+        await table.ReloadServerData();
+
+        _filterExpanded = false;
+        filterVariant = filter.IsEmpty ? Variant.Outlined : Variant.Filled;
+    }
+
+    bool _resetToToday { get; set; }
+
+    private async Task ResetFilter()
+    {
+        filter = new();
+
+        _resetToToday = true;
+        await Task.Delay(1);
+        _resetToToday = false;
+
+        await ApplyFilter();
+    }
+
+    object? GetValue(object obj, string propertyName, string? stringFormat = null)
+    {
+        var prop = obj.GetType().GetProperty(propertyName);
+        var value = prop?.GetValue(obj);
+
+        if (value is null)
+            return null;
+
+        if (!string.IsNullOrEmpty(stringFormat))
+        {
+            if (value is IFormattable formattable)
+                return formattable.ToString(stringFormat, null);
+        }
+
+        return value;
+    }
+
+    List<ColumnDefinition> Columns;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Columns = await LocalStorage.GetOrderColumns();
+        filterString = filter.ToString();
+    }
+
+    private async Task OnDeleteAsync(OrderResponse orderResponse)
+    {
+        var message = await _messageBox.ShowAsync();
+
+        if (message is not null)
+        {
+            var response = await client.DeleteAsync($"{ApiEndpoints.V1.Orders.Create}/{orderResponse.Id}");
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                await table.ReloadServerData();
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private async Task OpenEditDialogAsync(OrderResponse orderResponse)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<AddOrEditOrderDialog>
+        {
+            { x => x.Order, orderResponse },
+            { x => x.Stores, stores },
+            { x => x.Agents, agents.ToDictionary(x => x.Id, x => x.Name) },
+            { x => x.OrderType, (OrderType)type },
+            { x => x.IsEdit, true }
+        };
+
+        var dialog = await DialogService.ShowAsync<AddOrEditOrderDialog>("Редактировать", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    private async Task OpenAddDialogAsync()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<AddOrEditOrderDialog>
+        {
+            { x => x.Stores, stores },
+            { x => x.Agents, agents.ToDictionary(x => x.Id, x => x.Name) },
+            { x => x.OrderType, (OrderType)type }
+        };
+
+        var dialog = await DialogService.ShowAsync<AddOrEditOrderDialog>("Добавить", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    async Task ExportToExcel()
+    {
+        var response = await client.GetAsync($"{ApiEndpoints.V1.Orders.Export}?{pagedRequest.ToQuery()}");
+
+        var contentDisposition = response.Content.Headers.ContentDisposition;
+
+        var fileName = contentDisposition?.FileNameStar ??
+                       contentDisposition?.FileName ??
+                       "template";
+
+        var fileBytes = await response.Content.ReadAsByteArrayAsync();
+        var fileContent = Convert.ToBase64String(fileBytes);
+        var url = $"data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{fileContent}";
+
+        await JSRuntime.InvokeVoidAsync("downloadFile", url, fileName);
+    }
+
+    PagedRequest pagedRequest = new();
+    private async Task<TableData<OrderResponse>> ServerReload(TableState state, CancellationToken token)
+    {
+        IsLoading = true;
+        StateHasChanged();
+        pagedRequest.Filter = $"(Type,{type})";
+
+        if (!string.IsNullOrEmpty(filterString))
+        {
+            pagedRequest.Filter += $"and{filterString}";
+        }
+
+        if (pagedRequest.ResetPage)
+        {
+            pagedRequest.ResetPage = false;
+
+            if (state.Page != 0)
+                table.NavigateTo(0);
+        }
+
+        pagedRequest.Refresh(state);
+
+        string content = string.Empty;
+        try
+        {
+            canExport = false;
+            var response = await client.GetAsync($"{ApiEndpoints.V1.Orders.GetAll}?{pagedRequest.ToQuery()}", token);
+            content = await response.Content.ReadAsStringAsync();
+
+            var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+            var result = await response.Content.ReadFromJsonAsync<OrdersResponse>(options);
+
+            if (response.IsSuccessStatusCode && result is not null)
+            {
+                stores = result.Stores.ToDictionary(s => s.Id, s => s.Name);
+                storeList = result.Stores;
+                agents = result.Agents;
+                totalAmount = result.TotalAmount;
+
+                canExport = result.Total > 0;
+
+                return new TableData<OrderResponse>
+                    {
+                        TotalItems = result.Total,
+                        Items = result.Items
+                    };
+            }
+        }
+        catch (JsonException ex)
+        {
+            if (ex.Message.StartsWith("'<' is an invalid start of a value"))
+            {
+                Nav.NavigateTo(Nav.Uri, forceLoad: true);
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+
+            StateHasChanged();
+        }
+
+        return await Task.FromResult(new TableData<OrderResponse>
+            {
+                Items = new List<OrderResponse>()
+            });
+    }
+
+    public class FilterModel
+    {
+        public DateRange DateRange { get; set; }
+        public long? Code { get; set; }
+        public string? FromDate { get; set; }
+        public string? ToDate { get; set; }
+        public long? StoreId { get; set; }
+        public long? ManagerId { get; set; }
+        public long? AgentId { get; set; }
+
+        public FilterModel()
+        {
+            var endDate = DateTime.Now;
+            var statrtDate = new DateTime(endDate.Year, endDate.Month, 1);
+            DateRange = new DateRange(statrtDate, endDate);
+        }
+
+        public bool IsEmpty => (!DateRange.Start.HasValue || DateRange.Start.Value.Date == (new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1)).Date) &&
+                   (!DateRange.End.HasValue || DateRange.End.Value.Date == DateTime.Now.Date) &&
+                   !Code.HasValue &&
+                   !StoreId.HasValue &&
+                   !ManagerId.HasValue &&
+                   !AgentId.HasValue;
+
+        public override string ToString()
+        {
+            FromDate = DateRange.Start is not null ? DateRange.Start.Value.ToString("ddMMyyyy") : null;
+            ToDate = DateRange.End is not null ? DateRange.End.Value.ToString("ddMMyyyy") : null;
+
+            List<string> result = new List<string>();
+
+            if (!string.IsNullOrEmpty(FromDate))
+                result.Add($"(FromDate,{FromDate})");
+            if (!string.IsNullOrEmpty(ToDate))
+                result.Add($"(ToDate,{ToDate})");
+            if (Code.HasValue)
+                result.Add($"(Code,{Code})");
+            if (StoreId.HasValue)
+                result.Add($"(StoreId,{StoreId})");
+            if (ManagerId.HasValue)
+                result.Add($"(ManagerId,{ManagerId})");
+            if (AgentId.HasValue)
+                result.Add($"(AgentId,{AgentId})");
+
+            return string.Join("and", result);
+        }
+    }
+}

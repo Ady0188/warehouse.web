@@ -1,0 +1,63 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>aspnet-Warehouse.Web-af69e733-f6d8-4003-92fb-af9921a66efe</UserSecretsId>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Warehouse.Web.Agents\Warehouse.Web.Agents.csproj" />
+    <ProjectReference Include="..\..\Warehouse.Web.Catalog\Warehouse.Web.Catalog.csproj" />
+    <ProjectReference Include="..\..\Warehouse.Web.Managers\Warehouse.Web.Managers.csproj" />
+    <ProjectReference Include="..\..\Warehouse.Web.Operations\Warehouse.Web.Operations.csproj" />
+    <ProjectReference Include="..\..\Warehouse.Web.Orders\Warehouse.Web.Orders.csproj" />
+    <ProjectReference Include="..\..\Warehouse.Web.Reporting\Warehouse.Web.Reporting.csproj" />
+    <ProjectReference Include="..\..\Warehouse.Web.Stores\Warehouse.Web.Stores.csproj" />
+    <ProjectReference Include="..\..\Warehouse.Web.Users\Warehouse.Web.Users.csproj" />
+    <ProjectReference Include="..\Warehouse.Web.Client\Warehouse.Web.Client.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.*" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.*" />
+    <PackageReference Include="Extensions.MudBlazor.StaticInput" Version="2.*" />
+    <PackageReference Include="FastEndpoints" Version="5.21.2" />
+    <PackageReference Include="FastEndpoints.Security" Version="5.21.2" />
+    <PackageReference Include="FastEndpoints.Swagger" Version="5.21.2" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <None Update="libwkhtmltox.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\Agent.xltx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\AgentRemains.xltx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\MovementReport.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\NakladnoyReport.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\NakladnoyReport.xltx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\Operations.xltx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\Orders.xltx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\ProductRemains.xltx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

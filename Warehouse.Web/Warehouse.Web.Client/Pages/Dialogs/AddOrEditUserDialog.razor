@@ -1,0 +1,147 @@
+﻿@using System.Text.Json
+@using System.Text
+@inject HttpClient client
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form">
+            <MudGrid Style="padding: 0 0 10px 0;">
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@login Label="Логин" Required="true" Disabled=IsEdit Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@lastname Label="Фамилия" Required="true" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@firstname Label="Имя" Required="true" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@phone Label="Номер телефона" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@address Label="Адрес" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    @if (login != "admin")
+                    {
+                        <MudSelect T="long?" @bind-Value="storeId" Label="Склад" Required="true" Clearable>
+                            @foreach (var store in Stores)
+                            {
+                                <MudSelectItem T="long?" Value="store.Key">@store.Value</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="Reset">Сбросить</MudButton>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Сохранить</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public UserResponse User { get; set; }
+
+    [Parameter]
+    public Dictionary<long, string> Stores { get; set; }
+
+    [Parameter]
+    public bool IsEdit { get; set; }
+
+    private MudForm form;
+
+    string? login;
+    string? firstname;
+    string? lastname;
+    string? address;
+    string? phone;
+    long? storeId;
+
+    private async Task Submit()
+    {
+        await form.Validate();
+
+        if (!form.IsValid)
+        {
+            return;
+        }
+
+        var store = Stores.First(s => s.Key == storeId);
+
+        bool isSubmitSuccess = false;
+        if (IsEdit)
+        {
+            var updateRequest = new UpdateUserRequest(firstname, lastname, store.Key, store.Value, address, phone);
+
+            var response = await client.PutAsync($"{ApiEndpoints.V1.Users.Create}/{User.Id}", updateRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+        else
+        {
+            var addRequest = new CreateUserRequest(firstname, lastname, store.Key, store.Value, address, phone, login, "User");
+
+            var response = await client.PostAsync(ApiEndpoints.V1.Users.Create, addRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Reset()
+    {
+        firstname = default;
+        lastname = default;
+        storeId = default;
+        address = default;
+        phone = default;
+        login = default;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit)
+        {
+            firstname = User.Firstname;
+            lastname = User.Lastname;
+            storeId = User.StoreId;
+            address = User.Address;
+            phone = User.Phone;
+            login = User.Login;
+        }
+        else
+        {
+            Reset();
+        }
+
+        if (Stores.Count == 1)
+        {
+            storeId = Stores.First().Key;
+        }
+    }
+}

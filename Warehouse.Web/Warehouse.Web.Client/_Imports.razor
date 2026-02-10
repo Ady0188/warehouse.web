@@ -1,0 +1,30 @@
+﻿@using System.Net.Http
+@using System.Net.Http.Json
+@using Blazored.LocalStorage
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.JSInterop
+@using MudBlazor
+@using MudBlazor.Services
+@using Warehouse.Web.Client.Pages.Components
+@using Warehouse.Web.Client.Pages.Components.HistoryViews
+@using Warehouse.Web.Shared.Requests
+@using Warehouse.Web.Shared.Responses
+@using Warehouse.Web.Client.Helpers
+@using Warehouse.Web.Client.Pages.Dialogs
+@using System.Globalization
+@using System.Text.Json
+@using Warehouse.Web.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Warehouse.Web.Client.Models
+@using Append.Blazor.Printing
+
+@inject IDialogService DialogService
+@inject IAppSnackbarService Snackbar
+@inject ILocalStorageService LocalStorage
+@inject IPrintingService PrintingService
+@inject NavigationManager Nav

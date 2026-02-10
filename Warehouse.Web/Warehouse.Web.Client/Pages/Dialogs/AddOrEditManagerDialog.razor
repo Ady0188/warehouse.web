@@ -1,0 +1,136 @@
+﻿@using System.Text.Json
+@using System.Text
+@inject HttpClient client
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form">
+            <MudGrid Style="padding: 0 0 10px 0;">
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@lastname Label="Фамилия" Required="true" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@firstname Label="Имя" Required="true" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@phone Label="Номер телефона" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@address Label="Адрес" Clearable />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="long?" @bind-Value="storeId" Label="Склад" Required="true" Clearable>
+                        @foreach (var store in Stores)
+                        {
+                            <MudSelectItem T="long?" Value="store.Key">@store.Value</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="Reset">Сбросить</MudButton>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Сохранить</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public ManagerResponse Manager { get; set; }
+
+    [Parameter]
+    public Dictionary<long, string> Stores { get; set; }
+
+    [Parameter]
+    public bool IsEdit { get; set; }
+
+    private MudForm form;
+
+    string? firstname;
+    string? lastname;
+    string? address;
+    string? phone;
+    long? storeId;
+
+    private async Task Submit()
+    {
+        await form.Validate();
+
+        if (!form.IsValid)
+        {
+            return;
+        }
+
+        bool isSubmitSuccess = false;
+        if (IsEdit)
+        {
+            var updateRequest = new UpdateManagerRequest(firstname, lastname, storeId.Value, address, phone);
+
+            var response = await client.PutAsync($"{ApiEndpoints.V1.Managers.Create}/{Manager.Id}", updateRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+        else
+        {
+            var addRequest = new CreateManagerRequest(firstname, lastname, storeId.Value, address, phone);
+
+            var response = await client.PostAsync(ApiEndpoints.V1.Managers.Create, addRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Reset()
+    {
+        firstname = default;
+        lastname = default;
+        storeId = default;
+        address = default;
+        phone = default;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit)
+        {
+            firstname = Manager.Firstname;
+            lastname = Manager.Lastname;
+            storeId = Manager.StoreId;
+            address = Manager.Address;
+            phone = Manager.Phone;
+        }
+        else
+        {
+            Reset();
+        }
+
+        if (Stores.Count == 1)
+        {
+            storeId = Stores.First().Key;
+        }
+    }
+}

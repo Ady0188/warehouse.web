@@ -1,0 +1,133 @@
+﻿@using System.Text.Json
+@using System.Text
+@inject HttpClient client
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid Style="padding: 0 0 10px 0;">
+            <MudItem xs="12">
+                <MudStack Row="true" AlignItems="AlignItems.End" Justify="Justify.FlexStart">
+                    <MudStack Style="width:175px;">
+                        <MudDateTimePicker Label="С" @bind-Value=@fromDate />
+                    </MudStack>
+                    <MudStack Style="width:175px;">
+                        <MudDateTimePicker Label="По" @bind-Value=@toDate />
+                    </MudStack>
+
+                    <MudButton StartIcon="@Icons.Material.Filled.Update" Variant=Variant.Filled OnClick="Update">Обновить</MudButton>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTable ServerData="ServerReload" Dense="true" Hover="true" Striped="true" @ref=table RowStyleFunc="new Func<TurnoverResponse, int, string>(GetRowStyle)">
+                    <HeaderContent>
+                        <MudTh>Тип документа</MudTh>
+                        <MudTh Style="width:150px;">Дата время</MudTh>
+                        <MudTh Style="width:150px;">Склад</MudTh>
+                        <MudTh>Склад/Агент</MudTh>
+                        <MudTh Style="width:150px;">Количество</MudTh>
+                        <MudTh Style="width:150px;">Цена</MudTh>
+                        <MudTh Style="width:150px;">Сумма</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Name">@context.Operation</MudTd>
+                        <MudTd DataLabel="Quantity">@context.Date.ToString("dd.MM.yyyy HH:mm")</MudTd>
+                        <MudTd DataLabel="StoreName">@context.StoreName</MudTd>
+                        <MudTd DataLabel="AgentName">@context.AgentName</MudTd>
+                        <MudTd DataLabel="Quantity">@(Math.Abs(context.Quantity))</MudTd>
+                        <MudTd DataLabel="Price">@context.Price</MudTd>
+                        <MudTd DataLabel="Amount">@(Math.Abs(context.Amount))</MudTd>
+                    </RowTemplate>
+                    <FooterContent>
+                        <MudTh></MudTh>
+                        <MudTh></MudTh>
+                        <MudTh></MudTh>
+                        <MudTh>Остаток на конец</MudTh>
+                        <MudTh>@remains</MudTh>
+                        <MudTh></MudTh>
+                        <MudTh></MudTh>
+                    </FooterContent>
+                    <NoRecordsContent>
+                        <MudText>Нет данных, соответствующих фильтру</MudText>
+                    </NoRecordsContent>
+                    <LoadingContent>
+                        <MudText>Загрузка...</MudText>
+                    </LoadingContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+                    </PagerContent>
+                </MudTable>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public long AgentId { get; set; }
+
+    [Parameter]
+    public long ProductId { get; set; }
+
+    [Parameter]
+    public long StoreId { get; set; }
+
+    List<TurnoverResponse> turnovers = new();
+
+    MudTable<TurnoverResponse> table;
+    long remains;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    DateTime fromDate = DateTime.Now.AddDays(-7);
+    DateTime toDate = DateTime.Now;
+    int page = 1;
+    int pageSize = 10;
+
+    private string GetRowStyle(TurnoverResponse p, int row)
+    {
+        // if (p.Operation.Equals("Ревизия"))
+        //     return "background-color:#ffebee; color:#d32f2f;";
+        if (p.Operation.Equals("Ревизия"))
+            return "background-color:#e3f2fd; color:#2196f3;";
+
+        return "";
+    }
+
+    protected async Task Update()
+    {
+        await table.ReloadServerData();    
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        fromDate = new DateTime(toDate.Year, toDate.Month, 1, 0, 0, 0);
+    }
+
+    private async Task<TableData<TurnoverResponse>> ServerReload(TableState state, CancellationToken token)
+    {
+        page = state.Page + 1;
+        pageSize = state.PageSize;
+
+        var remainsResponse = await client.GetAsync($"{ApiEndpoints.V1.Reports.Turnovers}?page={page}&pageSize={pageSize}&agentId={AgentId}&productId={ProductId}&storeId={StoreId}&fromDate={fromDate.ToString("ddMMyyyyHHmmss")}&toDate={toDate.ToString("ddMMyyyyHHmmss")}");
+
+        if (remainsResponse.IsSuccessStatusCode)
+        {
+            var remainsResult = await remainsResponse.Content.ReadFromJsonAsync<TurnoversResponse>();
+
+            remains = remainsResult!.StartRemains;
+
+            return new TableData<TurnoverResponse>
+                {
+                    TotalItems = remainsResult!.Total,
+                    Items = remainsResult!.Items
+                };
+        }
+
+        return new TableData<TurnoverResponse>();
+    }
+}

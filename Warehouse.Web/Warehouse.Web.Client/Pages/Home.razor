@@ -1,0 +1,153 @@
+﻿@page "/"
+
+@inject HttpClient client;
+@inject IJSRuntime jsr
+
+@attribute [Authorize]
+
+@using System.Net.Http.Json
+
+<PageTitle>Главная страница</PageTitle>
+
+<MudCard>
+    <div style="height: 350px;">
+        <canvas id="chartfirst"></canvas>
+    </div>
+
+    <div style="height: 300px;">
+        <canvas id="chartsecond"></canvas>
+    </div>
+</MudCard>
+
+@code {
+    bool dataMLoaded = false;
+    bool dataDLoaded = false;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        string content = string.Empty;
+        try
+        {
+            var response = await client.GetAsync($"{ApiEndpoints.V1.Reports.Dashboard}");
+            content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var dataDateList = new List<List<decimal>>{
+                        new List<decimal>(),
+                        new List<decimal>(),
+                        new List<decimal>(),
+                        new List<decimal>(),
+                        new List<decimal>(),
+                        new List<decimal>()
+                    };
+
+                var dataMonthList = new List<List<decimal>>{
+                        new List<decimal>(),
+                        new List<decimal>(),
+                        new List<decimal>(),
+                        new List<decimal>(),
+                        new List<decimal>(),
+                        new List<decimal>()
+                    };
+
+                var storeMonthData = new List<decimal>();
+                var storeDateData = new List<decimal>();
+
+                var monthLabels = new List<string>();
+                var dateLabels = new List<string>();
+
+                var dataM = new List<decimal[]>();
+                var dataD = new List<decimal[]>();
+
+                long storeId = 0;
+                string monthTitle = string.Empty;
+                string dateTitle = string.Empty;
+
+                var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    };
+
+                var result = await response.Content.ReadFromJsonAsync<StoreMonthTradeTurnoversResponse>(options)!;
+
+                if (result.MonthTrade.Count() > 0)
+                {
+                    var resMonth = result.MonthTrade.ToList();
+                    var resDate = result.DateTrade.ToList();
+                    storeId = result.StoreId;
+
+                    var firstDateOfMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+
+                    dateTitle = $"Оборот с {firstDateOfMonth.ToString("dd.MM.yyyy")} по {DateTime.Now.ToString("dd.MM.yyyy")}";
+                    for (DateTime i = firstDateOfMonth; i <= new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day); i = i.AddDays(1))
+                    {
+                        dateLabels.Add(i.ToString("dd.MM"));
+                        if (storeId == 0)
+                        {
+                            dataDateList[0].Add(resDate.Any(x => x.Date == i && x.StoreId == 1) ? resDate.First(x => x.Date == i && x.StoreId == 1).Amount : 0);
+                            dataDateList[1].Add(resDate.Any(x => x.Date == i && x.StoreId == 2) ? resDate.First(x => x.Date == i && x.StoreId == 2).Amount : 0);
+                            dataDateList[2].Add(resDate.Any(x => x.Date == i && x.StoreId == 3) ? resDate.First(x => x.Date == i && x.StoreId == 3).Amount : 0);
+                            dataDateList[3].Add(resDate.Any(x => x.Date == i && x.StoreId == 4) ? resDate.First(x => x.Date == i && x.StoreId == 4).Amount : 0);
+                            dataDateList[4].Add(resDate.Any(x => x.Date == i && x.StoreId == 5) ? resDate.First(x => x.Date == i && x.StoreId == 5).Amount : 0);
+                            dataDateList[5].Add(resDate.Any(x => x.Date == i && x.StoreId == 6) ? resDate.First(x => x.Date == i && x.StoreId == 6).Amount : 0);
+                        }
+                        else
+                        {
+                            storeDateData.Add(resDate.Any(x => x.Date == i && x.StoreId == storeId) ? resDate.First(x => x.Date == i && x.StoreId == storeId).Amount : 0);
+                        }
+                    }
+
+                    var minDate = resMonth.Min(x => x.Date);
+                    monthTitle = $"Оборот с {minDate.ToString("MM.yy")} по {firstDateOfMonth.ToString("MM.yy")}";
+
+                    for (DateTime i = minDate; i <= new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1); i = i.AddMonths(1))
+                    {
+                        monthLabels.Add(i.ToString("MM.yy"));
+                        if (storeId == 0)
+                        {
+                            dataMonthList[0].Add(resMonth.Any(x => x.Date == i && x.StoreId == 1) ? resMonth.First(x => x.Date == i && x.StoreId == 1).Amount : 0);
+                            dataMonthList[1].Add(resMonth.Any(x => x.Date == i && x.StoreId == 2) ? resMonth.First(x => x.Date == i && x.StoreId == 2).Amount : 0);
+                            dataMonthList[2].Add(resMonth.Any(x => x.Date == i && x.StoreId == 3) ? resMonth.First(x => x.Date == i && x.StoreId == 3).Amount : 0);
+                            dataMonthList[3].Add(resMonth.Any(x => x.Date == i && x.StoreId == 4) ? resMonth.First(x => x.Date == i && x.StoreId == 4).Amount : 0);
+                            dataMonthList[4].Add(resMonth.Any(x => x.Date == i && x.StoreId == 5) ? resMonth.First(x => x.Date == i && x.StoreId == 5).Amount : 0);
+                            dataMonthList[5].Add(resMonth.Any(x => x.Date == i && x.StoreId == 6) ? resMonth.First(x => x.Date == i && x.StoreId == 6).Amount : 0);
+                        }
+                        else
+                        {
+                            storeMonthData.Add(resMonth.Any(x => x.Date == i && x.StoreId == storeId) ? resMonth.First(x => x.Date == i && x.StoreId == storeId).Amount : 0);
+                        }
+                    }
+
+                    dataM = dataMonthList.Select(x => x.ToArray()).ToList(); //new List<Array> { dataMain.ToArray(), dataDushanbe.ToArray(), dataKurgan.ToArray(), dataKulob.ToArray(), dataShahritus.ToArray() };
+                    dataD = dataDateList.Select(x => x.ToArray()).ToList(); //new List<Array> { dataMain.ToArray(), dataDushanbe.ToArray(), dataKurgan.ToArray(), dataKulob.ToArray(), dataShahritus.ToArray() };
+                    if (result.StoreId > 0)
+                    {
+                        dataM = new List<decimal[]> { storeMonthData.ToArray() };
+                        dataD = new List<decimal[]> { storeDateData.ToArray() };
+                    }
+                }
+
+                dataMLoaded = dataM.Any();
+                dataDLoaded = dataD.Any();
+
+                await jsr.InvokeVoidAsync("chartInit", storeId, monthTitle, dateTitle);
+
+                await jsr.InvokeVoidAsync("addAction", "first", monthLabels.ToArray(), dataM.ToArray(), dateLabels.ToArray(), dataD.ToArray(), storeId);
+            }
+            else
+            {
+                Snackbar.Error("Ошибка при получение данных");
+            }
+        }
+        catch (JsonException ex)
+        {
+            if (ex.Message.StartsWith("'<' is an invalid start of a value"))
+            {
+                await Task.Delay(500);
+                Nav.NavigateTo(Nav.Uri, forceLoad: true);
+            }
+        }
+    }
+}

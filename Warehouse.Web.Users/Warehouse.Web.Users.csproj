@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+	
+  <ItemGroup>
+	  <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.*" />
+	  <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.*" />
+
+	  <PackageReference Include="Ardalis.GuardClauses" Version="4.4.0" />
+	  <PackageReference Include="Ardalis.Result" Version="7.2.0" />
+	  <PackageReference Include="FastEndpoints" Version="5.21.2" />
+	  <PackageReference Include="MediatR" Version="12.2.0" />
+	  <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+	  <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+  </ItemGroup>
+	
+  <ItemGroup>
+    <ProjectReference Include="..\Warehouse.Web.Stores.Contracts\Warehouse.Web.Stores.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

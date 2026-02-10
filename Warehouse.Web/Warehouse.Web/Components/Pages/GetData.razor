@@ -1,0 +1,97 @@
+﻿@page "/Account/get/old/data"
+
+@using System.Text.Json
+@using System.Net.Http.Headers
+@using System.Text
+@using Warehouse.Web.Shared
+@using Warehouse.Web.Shared.Requests
+@using Warehouse.Web.Shared.Responses
+
+@rendermode InteractiveServer
+
+@inject HttpClient client
+@inject HttpClient client1
+
+<h3>GetData</h3>
+
+<MudGrid Style="padding: 0 0 10px 0;">
+    <MudItem xs="2">
+        <MudTextField T="string" @bind-Value=@host Label="Host" Required="true" Clearable />
+    </MudItem>
+    <MudItem xs="4">
+        <MudTextField T="string" @bind-Value=@path Label="Path" Clearable />
+    </MudItem>
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@table Label="Table" Clearable />
+    </MudItem>
+    <MudItem xs="12">
+        <MudTextField T="string" @bind-Value=@data Label="Path" Lines="10" Clearable />
+    </MudItem>
+</MudGrid>
+
+<MudButton Color="Color.Primary" OnClick="GetTaskAsync">Получить</MudButton>
+
+@code {
+    string host = "https://localhost:7177";
+    string path = "/api/v1";
+
+    string? table;
+    string data;
+
+    string url => $"{host}{path}";
+
+    JsonSerializerOptions options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+    async Task GetTaskAsync()
+    {
+        try
+        {
+            Console.WriteLine($"{url}/auth/login");
+            var response = await client.PostAsJsonAsync($"{url}/auth/login", new { Login = "Admin", Password = "123" });
+            var authRes = await response.Content.ReadAsStringAsync();
+
+            string token = string.Empty;
+            if (response.IsSuccessStatusCode)
+            {
+                var authResult = JsonSerializer.Deserialize<AuthResult>(authRes, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+                token = authResult.Token;
+            }
+            else
+                return;
+
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Replace("\"", ""));
+
+            var storesResponse = await client.GetAsync($"{url}/{table}s");
+
+            if (storesResponse.IsSuccessStatusCode)
+            {
+                data = await storesResponse.Content.ReadAsStringAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: {ex}");
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    public record AuthResult(string Name, string Role, string Token);
+
+    // public class StoresResponseOld
+    // {
+    //     public required IEnumerable<StoreResponseOld> Items { get; init; } = Enumerable.Empty<StoreResponseOld>();
+    // }
+}

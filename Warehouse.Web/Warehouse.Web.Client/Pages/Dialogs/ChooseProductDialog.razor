@@ -1,0 +1,418 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" Model="@Model">
+            <MudGrid Style="padding: 0 0 10px 0;">
+                <MudItem xs="12">
+                    @* <MudAutocomplete T="string" Label="Товар" @bind-Value="value1" SearchFunc="@Search"
+                    ResetValueOnEmptyText="@resetValueOnEmptyText"
+                    CoerceText="@coerceText" CoerceValue="@coerceValue" SelectValueOnTab="@selectedOnTab" /> *@
+
+                    @*  <MudAutocomplete @bind-Value="Model.SelectedProductValue"
+                                     SearchFunc=@SearchProducts
+                                     Label="Товар"
+                                     For="@(()=>Model.SelectedProductValue)"
+                                     Dense="true"
+                                     ResetValueOnEmptyText="true"
+                                     OpenIcon="@Icons.Material.Filled.ArrowDropDown"
+                                     CloseIcon="@Icons.Material.Filled.ArrowDropUp"
+                                     @ref="productSelect"
+                                     OnKeyDown="HandleProductKey" /> *@
+
+                    @* <MudAutocomplete @bind-Value="Model.SelectedProductValue"
+                    Immediate=true
+                    SearchFunc="SearchProducts"
+                    Label="Товар"
+                    Clearable=true
+                    @ref="productSelect"
+                    Modal=true
+                    OnKeyDown="HandleProductKey" /> *@
+                    @* <MudAutocomplete Value="Model.SelectedProductValue"
+                    Disabled=IsEdit
+                    Immediate=true
+                    SearchFunc="SearchProducts"
+                    Label="Товар"
+                    Clearable=true                    
+                    @ref="productAuto"
+                    Modal=true
+                    T="string"
+
+                    ValueChanged=@OnProductValueChanged /> *@
+
+                    <MudAutocomplete Value="Model.SelectedProductValue"
+                        Required=true
+                        Disabled=IsEdit
+                        Immediate=true
+                        SearchFunc="SearchProducts"
+                        Label="Товар"
+                        Clearable=true
+                        @ref="productAuto"
+                        Modal=true
+                        T="string"
+                        Dense
+                        MaxItems="50"
+                        ValueChanged=@OnProductValueChanged>
+
+                        <ItemTemplate Context="item">
+                            @if (!HasRemains(item) && !IsBuy)
+                            {
+                                <div style="color: gray; pointer-events: none; opacity: 0.6;">
+                                    @item
+                                </div>
+                            }
+                            else
+                            {
+                                <div>@item</div>
+                            }
+                        </ItemTemplate>
+                    </MudAutocomplete>
+
+                    @* <MudSelect T="long?"
+                               Label="Товар"
+                               For="@(()=>Model.ProductId)"
+                               @bind-Value="Model.ProductId"
+                               Clearable
+                               Required="true"
+                               @ref="productSelect"
+                               OnKeyDown="HandleProductKey">
+                        @foreach (var product in Products)
+                        {
+                            <MudSelectItem T="long?" Value="product.Key">@product.Value</MudSelectItem>
+                        }
+                    </MudSelect> *@
+                </MudItem>
+
+                <MudItem xs="8">
+                    <MudNumericField T="int?"
+                    Label="Количество"
+                    For="@(()=>Model.Quantity)"
+                    @bind-Value="Model.Quantity"
+                    Required="true"
+                    Clearable
+                    Immediate="true"
+                    Min=@quantityMin
+                    Validation=@ValidateQuantity
+                    @ref="quantityField"
+                    OnKeyDown="HandleQuantityKey" />
+                </MudItem>
+
+                <MudItem xs="4">
+                    <MudTextField T="long"
+                    @bind-Value="Model.Available"
+                    Label="Доступно"
+                    Disabled="true"
+                    Clearable />
+                </MudItem>
+
+                <MudItem xs="8">
+                    <MudNumericField T="decimal"
+                    Label=@titlePrice1
+                    For="@(()=>Model.Price1)"
+                    @bind-Value="Model.Price1"
+                    Required="true"
+                    Clearable
+                    Immediate="true"
+                    @ref="price1Field"
+                    OnKeyDown="HandlePriceKey" />
+                </MudItem>
+
+                <MudItem xs="4">
+                    <MudNumericField T="decimal"
+                    Label=@titlePrice2
+                    @bind-Value="Model.Price2"
+                    Clearable
+                    Immediate="true"
+                    Disabled="true" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">@(IsEdit ? "Изменить" : "Добавить")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter] public List<ProductResponse> Products { get; set; } = new();
+    [Parameter] public OperationProductRequest Product { get; set; }
+    [Parameter] public long StoreId { get; set; }
+    [Parameter] public bool IsBuy { get; set; }
+
+    [Parameter] public bool IsEdit { get; set; }
+
+    List<string> _products => Products.Select(x => x.Name).ToList();
+
+    private MudForm form;
+
+    // модель с валидацией
+    private ProductSelectionModel Model { get; set; } = new();
+
+    private Dictionary<long, string>? selectedProduct;
+
+    // refs для фокуса / открытия
+    private MudAutocomplete<string> productAuto;
+    private MudNumericField<int?> quantityField;
+    private MudNumericField<decimal> price1Field;
+
+    // пошаговая доступность
+    private bool isQuantityDisabled = true;
+    private bool isPriceDisabled = true;
+
+    string titlePrice1 => !IsBuy ? "Цена продажи" : "Цена покупки";
+    string titlePrice2 => IsBuy ? "Цена продажи" : "Цена покупки";
+
+    int? quantityMax => IsBuy ? null : (Model.Available > 0 ? (int ?)Model.Available : 0);
+    int? quantityMin;
+
+    // режим: только Enter или Enter+изменение
+    private bool enterOnly = false; // true -> переходы только по Enter
+
+    private string ValidateQuantity(int? value)
+    {
+        if (value == null)
+            return "Укажите количество";
+
+        if (value < 0)
+            return "Количество не может быть отрицательным";
+
+        if (value > quantityMax)
+            return $"Количество не может превышать {quantityMax}";
+
+        return null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && IsEdit)
+        {
+            Model.Price1 = Product.Price;
+            Model.Price2 = IsBuy ? Product.SellPrice : Product.BuyPrice;
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        if (!firstRender || IsEdit) return;
+
+        // 1) фокусим поле (каретка в инпуте)
+        await productAuto.FocusAsync();
+
+        // 2) чуть уступаем поток рендеру
+        await Task.Yield();
+
+        // 3) открываем меню
+        await productAuto.OpenMenuAsync();
+
+        // 4) снова возвращаем фокус в инпут, чтобы можно было сразу печатать
+        await productAuto.FocusAsync();
+    }
+
+    bool HasRemains(string item)
+    {
+        var _firstProduct = Products.FirstOrDefault(x => x.Name == item);
+
+        if (_firstProduct is null) return false;
+
+        return _firstProduct.StoresRemains.First(x => x.Key == StoreId).Value > 0;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!IsEdit || Product is null)
+            return;
+
+        var remains = Products
+            .First(x => x.Id == Product.ProductId)
+            .StoresRemains.First(x => x.Key == StoreId).Value;
+
+        Model.SelectedProductValue = Product.Name;
+        Model.ProductId = Product.ProductId;
+        Model.Quantity = Product.Quantity;
+        Model.Available = remains + Product.Quantity;
+
+        // Model.Price1 = Product.Price;
+        // Model.Price2 = IsBuy ? Product.SellPrice : Product.BuyPrice;
+    }
+
+    // --- Обработчики переходов (ValueChanged / Enter) ---
+    private Task<IEnumerable<string>> SearchProducts(string value, CancellationToken _)
+    {
+        IEnumerable<string> data = _products;
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            var term = value.Trim();
+            data = _products.Where(p =>
+                p.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
+        }
+
+        // опционально ограничим выдачу
+        return Task.FromResult(data.Take(50));
+    }
+    // private Task<IEnumerable<KeyValuePair<long, string>>> SearchProducts(string value)
+    // {
+    //     IEnumerable<KeyValuePair<long, string>> data = Products;
+
+    //     if (!string.IsNullOrWhiteSpace(value))
+    //     {
+    //         var term = value.Trim();
+    //         data = Products.Where(p =>
+    //             p.Value?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
+    //     }
+
+    //     // Можно ограничить выдачу, например, Top 50:
+    //     return Task.FromResult(data.Take(50));
+    // }
+    private void OnPriceInput(ChangeEventArgs e)
+    {
+        if (decimal.TryParse(
+            e.Value?.ToString(),
+            NumberStyles.Any,
+            CultureInfo.CurrentCulture,
+            out var value))
+        {
+            Model.Price1 = value;
+        }
+    }
+
+    private async Task OnProductChanged(long? _)
+    {
+        if (enterOnly) return; // в режиме только Enter не реагируем на изменение
+        await EnableQuantityAndFocus();
+    }
+
+    private async Task HandleProductKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrEmpty(Model.SelectedProductValue))
+        {
+            Model.ProductId = Products.First(x => x.Name == Model.SelectedProductValue).Id;
+            await EnableQuantityAndFocus();
+        }
+    }
+
+    private async Task EnableQuantityAndFocus()
+    {
+        if (Model.ProductId is not null)
+            await quantityField.FocusAsync();
+
+        StateHasChanged();
+    }
+
+    private async Task OnQuantityChanged(int _)
+    {
+        if (enterOnly) return;
+        await EnablePriceAndFocus();
+    }
+
+    private async Task HandleQuantityKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && Model.Quantity > 0)
+            await EnablePriceAndFocus();
+    }
+
+    private async Task EnablePriceAndFocus()
+    {
+        if (Model.Quantity >= 0)
+            await price1Field.FocusAsync();
+
+        StateHasChanged();
+    }
+
+    private async Task OnPriceChanged(decimal _)
+    {
+        if (enterOnly) return; // автосабмит только если не "только Enter"
+        await TrySubmitIfValid();
+    }
+
+    private async Task HandlePriceKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await TrySubmitIfValid();
+    }
+
+    private async Task TrySubmitIfValid()
+    {
+        await form.Validate();
+        if (form.IsValid)
+            await Submit();
+    }
+
+    private async Task Submit()
+    {
+        await form.Validate();
+        if (!form.IsValid)
+            return;
+
+        Product.Quantity = Model.Quantity ?? 0;
+        Product.Price = Model.Price1;
+
+        var chosen = Products.First(x => x.Id == Model.ProductId);
+
+        Product.ProductId = chosen.Id;
+        Product.Code = chosen.Code;
+        Product.Name = chosen.Name;
+        Product.Manufacturer = chosen.Manufacturer;
+        Product.Unit = chosen.Unit;
+        Product.BuyPrice = chosen.BuyPrice;
+        Product.SellPrice = chosen.SellPrice;
+
+        MudDialog.Close(DialogResult.Ok(Model));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    // -- Модель с атрибутами валидации --
+    public class ProductSelectionModel
+    {
+        [Required(ErrorMessage = "Выберите товар")]
+        public string SelectedProductValue { get; set; }
+
+        [Required(ErrorMessage = "Выберите товар")]
+        public KeyValuePair<long, string> SelectedProduct { get; set; }
+
+        [Required(ErrorMessage = "Выберите товар")]
+        public long? ProductId { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "Количество должно быть больше 0")]
+        public int? Quantity { get; set; }
+
+        [Range(0, int.MaxValue, ErrorMessage = "Доступно не может быть меньше 0")]
+        public long Available { get; set; }
+
+        // [Range(typeof(decimal), "0.01", "9999999999", ErrorMessage = "Цена должна быть больше 0")]
+        public decimal Price1 { get; set; }
+
+        // [Range(typeof(decimal), "0.01", "9999999999", ErrorMessage = "Цена должна быть больше 0")]
+        public decimal Price2 { get; set; }
+    }
+    private void OnProductValueChanged1(string args, CancellationToken _)
+    {
+        throw new NotImplementedException();
+    }
+
+    private async Task OnProductValueChanged(string? value)
+    {
+        var _choesen = Products.FirstOrDefault(x => x.Name == value);
+
+        if (string.IsNullOrEmpty(value) || _choesen is null || (_choesen.StoresRemains.First(x => x.Key == StoreId).Value <= 0 && !IsBuy))
+        {
+            Model.SelectedProductValue = string.Empty;
+            return;
+        }
+
+        Model.SelectedProductValue = value;
+        Model.ProductId = _choesen.Id;
+        
+        Model.Available = _choesen.StoresRemains.First(x => x.Key == StoreId).Value;
+        Model.Price1 = IsBuy ? _choesen.BuyPrice : _choesen.SellPrice;
+        Model.Price2 = !IsBuy ? _choesen.BuyPrice : _choesen.SellPrice;
+
+        await EnableQuantityAndFocus();
+    }
+}

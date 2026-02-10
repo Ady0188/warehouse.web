@@ -1,0 +1,160 @@
+﻿<div class="month-picker-root" style="display:flex; gap:8px; align-items:center;">
+    <MudSelect T="int" Label="@YearLabel" Value="SelectedYear" ValueChanged="YearChanged" Dense="true" Style="min-width:100px;">
+        @foreach (var y in Years)
+        {
+            <MudSelectItem Value="y">@y</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="int" Label="@MonthLabel" Value="SelectedMonth" ValueChanged="MonthChanged" Dense="true" Style="min-width:140px;">
+        @* @for (int m = 1; m <= 12; m++) *@
+        @foreach (var m in MonthNames)
+        {
+            <MudSelectItem Value="m.Key">@m.Value</MudSelectItem>
+        }
+    </MudSelect>
+
+    @if (ShowApplyButton)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Apply" Disabled="@(!CanApply)" Dense="true">Применить</MudButton>
+    }
+</div>
+
+@code {
+    // Parameters
+    [Parameter] public int? Year { get; set; } // начальное значение (если нужно)
+    [Parameter] public int? Month { get; set; } // начальное значение (1..12)
+
+    [Parameter] public EventCallback<Period> PeriodChanged { get; set; } // событие при изменении/применении
+
+    [Parameter] public bool UpToTodayForCurrentMonth { get; set; } = true; // для текущего месяца окончание = today
+    [Parameter] public int PastYears { get; set; } = 5; // сколько лет назад показывать
+    [Parameter] public int FutureYears { get; set; } // сколько лет вперёд показывать
+    [Parameter] public bool ShowApplyButton { get; set; } = false; // если true — требуется нажать Применить
+    [Parameter] public string YearLabel { get; set; } = "Год";
+    [Parameter] public string MonthLabel { get; set; } = "Месяц";
+
+    // Internal state
+    private int SelectedYear;
+    private int SelectedMonth;
+    private List<int> Years = new();
+    private Dictionary<int, string> MonthNames = new();
+    CultureInfo culture = CultureInfo.CurrentCulture;
+
+    [Parameter] public bool ResetToToday { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (ResetToToday)
+        {
+            SelectedYear = DateTime.Today.Year;
+            SelectedMonth = DateTime.Today.Month;
+            UpdateMonths();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        var nowYear = DateTime.Now.Year;
+        var nowMonth = DateTime.Now.Month;
+        // заполним месяцы локально (CultureInfo можно подставить)
+
+        // начальные выбранные значения
+        SelectedYear = Year ?? nowYear;
+        SelectedMonth = Month ?? nowMonth;
+
+        UpdateMonths();
+
+        // диапазон годов
+        int startYear = nowYear - PastYears;
+        int endYear = nowYear + FutureYears;
+        Years = Enumerable.Range(startYear, endYear - startYear + 1).ToList();
+
+        // если не используется кнопка Apply, то сразу пушим изменение
+        // if (!ShowApplyButton)
+        //     _ = NotifyPeriodChangedAsync();
+    }
+
+    private bool CanApply => SelectedMonth >= 1 && SelectedMonth <= 12;
+
+    private async Task Apply()
+    {
+        await NotifyPeriodChangedAsync();
+    }
+
+    private void UpdateMonths()
+    {
+        MonthNames = new();
+
+        int ind = 0;
+        int fromMonth = 1;
+        int toMonth = 12;
+        if (DateTime.Now.Year == SelectedYear && SelectedYear == 2025)
+        {
+            ind = 9;
+            fromMonth = 10;
+            toMonth = DateTime.Now.Month;
+        }
+        else if (SelectedYear == 2025)
+        {
+            ind = 9;
+            fromMonth = 10;
+        }
+        else if (DateTime.Now.Year == SelectedYear)
+        {
+            toMonth = DateTime.Now.Month;
+        }
+
+        var range = Enumerable.Range(fromMonth, toMonth - fromMonth + 1).ToArray();
+
+        foreach (var item in range.Select(m => culture.DateTimeFormat.GetMonthName(m)))
+        {
+            ind++;
+            MonthNames.Add(ind, item);
+        }
+    }
+
+    private void YearChanged(int value)
+    {
+        SelectedYear = value;
+
+        UpdateMonths();
+
+        SelectedMonth = MonthNames.Keys.Last();
+
+        if (!ShowApplyButton)
+            _ = NotifyPeriodChangedAsync();
+    }
+
+    private void MonthChanged(int value)
+    {
+        SelectedMonth = value;
+        if (!ShowApplyButton)
+            _ = NotifyPeriodChangedAsync();
+    }
+
+    private async Task NotifyPeriodChangedAsync()
+    {
+        var start = new DateTime(SelectedYear, SelectedMonth, 1).Date;
+
+        DateTime end;
+        var today = DateTime.Now.Date;
+        if (UpToTodayForCurrentMonth && SelectedYear == today.Year && SelectedMonth == today.Month)
+        {
+            // до текущего дня включительно
+            end = today.Date;
+            // для удобства фильтрации в БД можно вернуть конец дня:
+            end = end.Date.AddDays(1).AddTicks(-1);
+        }
+        else
+        {
+            // конец выбранного месяца включительно
+            var lastDay = DateTime.DaysInMonth(SelectedYear, SelectedMonth);
+            end = new DateTime(SelectedYear, SelectedMonth, lastDay).Date.AddDays(1).AddTicks(-1);
+        }
+
+        var period = new Period(start.Date, end);
+        if (PeriodChanged.HasDelegate)
+            await PeriodChanged.InvokeAsync(period);
+    }
+}

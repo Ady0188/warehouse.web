@@ -1,0 +1,154 @@
+﻿@page "/history"
+
+@inject HttpClient client
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageContent Title="Журнал действия" @ref=pageContent>
+    <ChildContent>
+        <MudTable ServerData="ServerReload" Dense="true" Hover="true" Striped="true" @ref=table>
+            <HeaderContent>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    <MudTh><MudTableSortLabel SortLabel=@col.PropertyName T="StoreResponse" Style=@col.Style>@col.Title</MudTableSortLabel></MudTh>
+                }
+                <MudTh Style="width: 100px;"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    if (col.PropertyName == "Method")
+                    {
+                        <MudChip Text="purple" Color=@context.Method.GetColor() Value="@Color.Primary">@context.Method.GetOperationName()</MudChip>
+                    }
+                    else
+                    {
+                        <MudTd>@GetValue(context, col.PropertyName, col.StringFormat)</MudTd>
+                    }
+                }
+                <MudTd>
+                    <MudStack Row=true AlignItems=AlignItems.Center Style="width: 100%;">
+                        <ActionButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Secondary" Tooltip="Просмотр" OnClick=@(() => OpenShowDialogAsync(context)) />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Нет данных, соответствующих фильтру</MudText>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Загрузка...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+            </PagerContent>
+        </MudTable>
+    </ChildContent>
+</PageContent>
+
+@code {
+    private string _buttonText = "ФИО";
+    bool IsLoading;
+    private MudTable<HistoryResponse> table;
+
+    PageContent pageContent;
+    MudMessageBox _messageBox => pageContent.MessageBox;
+
+    DialogOptions dialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false };
+
+    object? GetValue(object obj, string propertyName, string? stringFormat = null)
+    {
+        var prop = obj.GetType().GetProperty(propertyName);
+        var value = prop?.GetValue(obj);
+
+        if (value is null)
+            return null;
+
+        if (!string.IsNullOrEmpty(stringFormat))
+        {
+            if (value is IFormattable formattable)
+                return formattable.ToString(stringFormat, null);
+        }
+
+        return value;
+    }
+
+    List<ColumnDefinition> Columns;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Columns = await LocalStorage.GetHistoryColumns();
+    }
+
+    private async Task OpenShowDialogAsync(HistoryResponse historyResponse)
+    {
+        if (historyResponse.ObjectName == "Operation")
+            dialogOptions = new() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false };
+
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<HistoryView>
+        {
+            { x => x.History, historyResponse }
+        };
+
+        var dialog = await DialogService.ShowAsync<HistoryView>($"{historyResponse.Method.GetOperationName()} {historyResponse.ObjName} {historyResponse.CreatedDate.ToString("dd.MM.yyyy HH:mm")}", parameters, dialogOptions);
+    }
+
+    PagedRequest pagedRequest = new();
+    private async Task<TableData<HistoryResponse>> ServerReload(TableState state, CancellationToken token)
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        if (pagedRequest.ResetPage)
+        {
+            pagedRequest.ResetPage = false;
+
+            if (state.Page != 0)
+                table.NavigateTo(0);
+        }
+
+        pagedRequest.Refresh(state);
+
+        string content = string.Empty;
+        try
+        {
+            var response = await client.GetAsync($"{ApiEndpoints.V1.History.GetAll}?{pagedRequest.ToQuery()}", token);
+            content = await response.Content.ReadAsStringAsync();
+
+            var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+            var result = await response.Content.ReadFromJsonAsync<HistoriesResponse>(options);
+
+            if (response.IsSuccessStatusCode && result is not null)
+            {
+                return new TableData<HistoryResponse>
+                    {
+                        TotalItems = result.Total,
+                        Items = result.Items
+                    };
+            }
+        }
+        catch (JsonException ex)
+        {
+            if (ex.Message.StartsWith("'<' is an invalid start of a value"))
+            {
+                Nav.NavigateTo(Nav.Uri, forceLoad: true);
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+
+            StateHasChanged();
+        }
+
+        return await Task.FromResult(new TableData<HistoryResponse>
+            {
+                Items = new List<HistoryResponse>()
+            });
+    }
+}

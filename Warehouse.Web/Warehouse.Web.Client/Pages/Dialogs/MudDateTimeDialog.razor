@@ -1,0 +1,44 @@
+﻿<MudPaper Class="pa-4" Style="min-width:320px;">
+    <MudStack Spacing="2">
+        <MudDatePicker @bind-Date="DatePart" Label="Дата" PickerVariant="PickerVariant.Inline"
+        MinDate="@MinDate" MaxDate="@MaxDate" DateFormat="@DateFormat" />
+        <MudTimePicker @bind-Time="TimePart" Label="Время" AmPm="false" />
+        <MudStack Row Justify="Justify.FlexEnd" Spacing="1">
+            <MudButton Variant="Variant.Text" OnClick="Cancel">Отмена</MudButton>
+            <MudButton Variant="Variant.Filled" OnClick="Ok">Ок</MudButton>
+        </MudStack>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter] public DateTime InitialValue { get; set; } = DateTime.Now;
+    [Parameter] public DateTime? MinDate { get; set; }
+    [Parameter] public DateTime? MaxDate { get; set; }
+    [Parameter] public string DisplayFormat { get; set; } = "dd.MM.yyyy HH:mm";
+
+    private DateTime? DatePart { get; set; }
+    private TimeSpan? TimePart { get; set; }
+
+    private string DateFormat => "dd.MM.yyyy";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        DatePart = InitialValue.Date;
+        TimePart = InitialValue.TimeOfDay;
+    }
+
+    private void Ok()
+    {
+        var combined = DatePart.Value.Date + TimePart.Value;
+        MudDialog.Close(DialogResult.Ok(combined));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

@@ -1,0 +1,234 @@
+﻿@implements IDisposable
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+<MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+
+    @if (IsWide)
+    {
+        <MudButton OnClick="@(() => NavigateTo("/"))" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Home" Color="Color.Inherit">
+            Главная
+        </MudButton>
+
+        <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.MenuBook" Color="Color.Inherit">
+                    Справочники
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <AuthorizeView Roles="Admin">
+                    <MudMenuItem OnClick="@(() => NavigateTo("/stores"))" Icon="@Icons.Material.Filled.Store" Label="Склады" />
+                    <MudMenuItem OnClick="@(() => NavigateTo("/employees"))" Icon="@Icons.Material.Filled.Badge" Label="Сотрудники" />
+                </AuthorizeView>
+
+                <MudMenuItem OnClick="@(() => NavigateTo("/managers"))" Icon="@Icons.Material.Filled.SupervisorAccount" Label="Менеджеры" />
+            </ChildContent>
+        </MudMenu>
+
+        <MudButton OnClick="@(() => NavigateTo("/agents"))" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Groups" Color="Color.Inherit">
+            Контрагенты
+        </MudButton>
+
+        <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Category" Color="Color.Inherit">
+                    Товары
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem OnClick="@(() => NavigateTo("/products"))" Icon="@Icons.Material.Filled.Inventory" Label="Список" />
+                <MudMenuItem OnClick="@(() => NavigateTo("/productsremains"))" Icon="@Icons.Material.Filled.Assessment" Label="Остатки" />
+
+                <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+                    <ActivatorContent>
+                        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.CompareArrows" Color="Color.Inherit">
+                            Перемещения
+                        </MudButton>
+                    </ActivatorContent>
+                    <ChildContent>
+                        <MudMenuItem OnClick="@(() => NavigateTo("/operations/send"))" Icon="@Icons.Material.Filled.CallMade" Label="Отправка" />
+                        <MudMenuItem OnClick="@(() => NavigateTo("/operations/receive"))" Icon="@Icons.Material.Filled.CallReceived" Label="Получение" />
+                    </ChildContent>
+                </MudMenu>
+            </ChildContent>
+        </MudMenu>
+
+        <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.FactCheck" Color="Color.Inherit">
+                    Ревизии
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem OnClick="@(() => NavigateTo("/audit/products"))" Icon="@Icons.Material.Filled.Inventory2" Label="Товары" />
+                <MudMenuItem OnClick="@(() => NavigateTo("/audit/agents"))" Icon="@Icons.Material.Filled.FindInPage" Label="Контрагенты" />
+            </ChildContent>
+        </MudMenu>
+
+        <AuthorizeView Roles="Admin">
+            <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+                <ActivatorContent>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit">
+                        Закупки
+                    </MudButton>
+                </ActivatorContent>
+                <ChildContent>
+                    <MudMenuItem OnClick="@(() => NavigateTo("/operations/receiving"))" Icon="@Icons.Material.Filled.Inventory2" Label="Приемки" />
+                    <MudMenuItem OnClick="@(() => NavigateTo("/operations/returntosuplier"))" Icon="@Icons.Material.Filled.FindInPage" Label="Возвраты поставщикам" />
+                </ChildContent>
+            </MudMenu>
+        </AuthorizeView>
+
+        <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ShoppingCartCheckout" Color="Color.Inherit">
+                    Продажа
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem OnClick="@(() => NavigateTo("/operations/shipments"))" Icon="@Icons.Material.Filled.LocalShipping" Label="Отгрузки" />
+                <MudMenuItem OnClick="@(() => NavigateTo("/operations/buyerreturn"))" Icon="@Icons.Material.Filled.Undo" Label="Возвраты покупателей" />
+            </ChildContent>
+        </MudMenu>
+
+        <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Inherit">
+                    Финансы
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem OnClick="@(() => NavigateTo("/orders/receipts"))" Icon="@Icons.Material.Filled.CallReceived" Label="Приходный ордер" />
+                <MudMenuItem OnClick="@(() => NavigateTo("/orders/outgoings"))" Icon="@Icons.Material.Filled.CallMade" Label="Расходный ордер" />
+                <MudMenuItem OnClick="@(() => NavigateTo("/debts"))" Icon="@Icons.Material.Filled.MoneyOff" Label="Долги" />
+            </ChildContent>
+        </MudMenu>
+
+        <AuthorizeView Roles="Admin">
+            <MudButton OnClick="@(() => NavigateTo("/history"))" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.History" Color="Color.Inherit">
+                Журнал действий
+            </MudButton>
+        </AuthorizeView>
+    }
+    else
+    {
+        <MudButton OnClick="@(() => NavigateTo("/"))" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Home" Color="Color.Inherit">
+            Главная
+        </MudButton>
+
+        <AuthorizeView Roles="Admin">
+            <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+                <ActivatorContent>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit">
+                        Закупки
+                    </MudButton>
+                </ActivatorContent>
+                <ChildContent>
+                    <MudMenuItem OnClick="@(() => NavigateTo("/operations/receiving"))" Icon="@Icons.Material.Filled.Inventory2" Label="Приемки" />
+                    <MudMenuItem OnClick="@(() => NavigateTo("/operations/returntosuplier"))" Icon="@Icons.Material.Filled.FindInPage" Label="Возвраты поставщикам" />
+                </ChildContent>
+            </MudMenu>
+        </AuthorizeView>
+
+        <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ShoppingCartCheckout" Color="Color.Inherit">
+                    Продажа
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem OnClick="@(() => NavigateTo("/operations/shipments"))" Icon="@Icons.Material.Filled.LocalShipping" Label="Отгрузки" />
+                <MudMenuItem OnClick="@(() => NavigateTo("/operations/buyerreturn"))" Icon="@Icons.Material.Filled.Undo" Label="Возвраты покупателей" />
+            </ChildContent>
+        </MudMenu>
+
+        <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Inherit">
+                    Финансы
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem OnClick="@(() => NavigateTo("/orders/receipts"))" Icon="@Icons.Material.Filled.CallReceived" Label="Приходный ордер" />
+                <MudMenuItem OnClick="@(() => NavigateTo("/orders/outgoings"))" Icon="@Icons.Material.Filled.CallMade" Label="Расходный ордер" />
+                <MudMenuItem OnClick="@(() => NavigateTo("/debts"))" Icon="@Icons.Material.Filled.MoneyOff" Label="Долги" />
+            </ChildContent>
+        </MudMenu>
+
+        <MudMenu FullWidth="true" ActivationEvent="@MouseEvent.LeftClick">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.More" Color="Color.Inherit">
+                    Еще
+                </MudButton>
+            </ActivatorContent>
+            <ChildContent>
+                <MudNavGroup Title="Справочники" Icon="@Icons.Material.Filled.MenuBook">
+                    <AuthorizeView Roles="Admin">
+                        <MudNavLink Href="stores" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Store">Склады</MudNavLink>
+                        <MudNavLink Href="employees" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Badge">Сотрудники</MudNavLink>
+                    </AuthorizeView>
+                    <MudNavLink Href="managers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SupervisorAccount">Менеджеры</MudNavLink>
+                </MudNavGroup>
+                
+                <MudNavLink Href="agents" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Groups">Контрагенты</MudNavLink>
+
+                <MudNavGroup Title="Товары" Icon="@Icons.Material.Filled.Category">
+                    <MudNavLink Href="products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory">Список</MudNavLink>
+                    <MudNavLink Href="productsremains" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment">Остатки</MudNavLink>
+
+                    <MudNavGroup Title="Перемещения" Icon="@Icons.Material.Filled.CompareArrows">
+                        <MudNavLink Href="operations/send" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallMade">Отправка</MudNavLink>
+                        <MudNavLink Href="operations/receive" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallReceived">Получение</MudNavLink>
+                    </MudNavGroup>
+                </MudNavGroup>
+
+                <MudNavGroup Title="Ревизии" Icon="@Icons.Material.Filled.FactCheck">
+                    <MudNavLink Href="audit/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory2">Товары</MudNavLink>
+                    <MudNavLink Href="audit/agents" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FindInPage">Контрагенты</MudNavLink>
+                </MudNavGroup>
+
+                <AuthorizeView Roles="Admin">
+                    <MudNavLink Href="history" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">Журнал действий</MudNavLink>
+                </AuthorizeView>
+            </ChildContent>
+        </MudMenu>
+    }
+
+</MudStack>
+
+
+<MudDivider Vertical />
+
+@code {
+    private Breakpoint _currentBreakpoint;
+    private string? currentUrl;
+
+    private bool IsWide => _currentBreakpoint >= Breakpoint.Lg; 
+
+    void NavigateTo(string url) => Nav.NavigateTo(url);
+
+    protected override void OnInitialized()
+    {
+        currentUrl = Nav.ToBaseRelativePath(Nav.Uri);
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = Nav.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+
+    private Task OnBreakpointChanged(Breakpoint bp)
+    {
+        _currentBreakpoint = bp;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+}

@@ -1,0 +1,299 @@
+﻿@page "/save/old/data"
+
+@using System.Text
+
+@inject HttpClient client
+
+<h3>GetData</h3>
+
+<MudGrid Style="padding: 0 0 10px 0;">
+    <MudItem xs="2">
+        <MudSelect @bind-Value="table" Label="Table" Required="true" Clearable>
+            @foreach (var t in tables)
+            {
+                <MudSelectItem T="string" Value="t.Key">@t.Value</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+    <MudItem xs="10">
+        <MudTextField @bind-Value=@data Label="Data" Lines="10" Clearable />
+    </MudItem>
+</MudGrid>
+
+<MudButton Color="Color.Primary" OnClick="SaveTaskAsync">Сохранить</MudButton>
+        <MudText @bind-Value=@saveResult />
+
+@code {
+    string? table;
+    string? data;
+    string? saveResult;
+
+    Dictionary<string, string> tables = new Dictionary<string, string>
+    {
+        { "store", "stores" },
+        { "manager", "Managers" },
+        { "agent", "Agents" },
+        { "product", "Products" },
+        { "paudit", "Products Audit" },
+        { "agdebts", "Agents Debts" }
+    };
+
+    public Dictionary<long, List<OperationProductResponse>> AuditProducts = new();
+    public List<AgentResponse> AgentsItems = new();
+
+    async Task SaveTaskAsync()
+    {
+        saveResult = string.Empty;
+
+        if(table == "store")
+        {
+            var dataToSave = JsonSerializer.Deserialize<StoresResponse>(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+
+            var stores = dataToSave.Items.OrderBy(x => x.Id).ToList();
+
+            foreach (var item in stores)
+            {
+                var addRequest = new CreateStoreRequest(item.Name);
+
+                var response1 = await client.PostAsync(ApiEndpoints.V1.Stores.Create, new StringContent(JsonSerializer.Serialize(addRequest), Encoding.UTF8, "application/json"));
+                var result1 = await response1.Content.ReadAsStringAsync();
+            }
+        }
+        else if (table == "manager")
+        {
+            var dataToSave = JsonSerializer.Deserialize<ManagersResponse>(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+
+            var items = dataToSave.Items.OrderBy(x => x.Id).ToList();
+
+            foreach (var item in items)
+            {
+                var addRequest = new CreateManagerRequest(item.Firstname, item.Lastname, item.StoreId, item.Address, item.Phone.Substring(0, 9));
+
+                var response1 = await client.PostAsync(ApiEndpoints.V1.Managers.Create, new StringContent(JsonSerializer.Serialize(addRequest), Encoding.UTF8, "application/json"));
+                var result1 = await response1.Content.ReadAsStringAsync();
+
+                await Task.Delay(100);
+            }
+        }
+        else if (table == "agent")
+        {
+            var response = await client.GetAsync($"{ApiEndpoints.V1.Managers.GetAll}?page=1&pagesize=100&search=&filter=&sortfield=");
+
+            var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+            var result = await response.Content.ReadFromJsonAsync<ManagersResponse>(options);
+
+            var managers = result.Items;
+
+            var dataToSave = JsonSerializer.Deserialize<List<Agent>>(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+
+            var items = dataToSave.OrderBy(x => x.Id).ToList();
+
+            foreach (var item in items)
+            {
+                var managerId = item.ManagerId;
+
+                if (managerId > 18)
+                    managerId = managerId - 3;
+                else if (managerId > 13)
+                    managerId = managerId - 1;
+
+                var manager = managers.First(x => x.Id == managerId);
+
+                var address = item.Address is not null && item.Address.StartsWith("Мизо") ? string.Empty : item.Address;
+                var addRequest = new CreateAgentRequest(item.Name, item.Phone, address, manager.StoreId, manager.StoreName, manager.Id, $"{manager.Lastname} {manager.Firstname}".Trim(), item.Comment);
+
+                var response1 = await client.PostAsync(ApiEndpoints.V1.Agents.Create, new StringContent(JsonSerializer.Serialize(addRequest), Encoding.UTF8, "application/json"));
+                var result1 = await response1.Content.ReadAsStringAsync();
+            }
+        }
+        else if (table == "product")
+        {
+            var dataToSave = JsonSerializer.Deserialize<ProductsResponse>(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+
+            var items = dataToSave.Items.OrderBy(x => x.Id).ToList();
+
+            foreach (var item in items)
+            {
+                var addRequest = new CreateProductRequest(item.Name, item.Manufacturer, item.Unit, item.BuyPrice, item.SellPrice, item.LimitRemain);
+
+                var response1 = await client.PostAsync(ApiEndpoints.V1.Products.Create, new StringContent(JsonSerializer.Serialize(addRequest), Encoding.UTF8, "application/json"));
+                var result1 = await response1.Content.ReadAsStringAsync();
+            }
+        }
+        else if (table == "agdebts")
+        {
+            try
+            {
+                var dataToSave = JsonSerializer.Deserialize<AgentsDebtsResponseOld>(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+
+                var items = dataToSave.Items.OrderBy(x => x.Name).ToList();
+                var notSavedCount = 0;
+                var savedCount = 0;
+                foreach (var item in items)
+                {
+                    var a = AgentsItems.FirstOrDefault(x => x.Name.Trim().ToLower() == item.Name.Trim().ToLower());
+
+                    if (a is not null)
+                    {
+                        if (item.DebtOnEnd == 0)
+                            continue;
+
+                        var orderType = 0;
+                        if (item.DebtOnEnd > 0)
+                            orderType = 1;
+
+                        var addRequest = new CreateOrderRequest(DateTime.Now.Date.ToString("ddMMyyyyHHmm"), default, a.StoreId, a.Id, Math.Abs(item.DebtOnEnd), "Долг на начало", orderType, null);
+
+                        var response1 = await client.PostAsync(ApiEndpoints.V1.Orders.Create, new StringContent(JsonSerializer.Serialize(addRequest), Encoding.UTF8, "application/json"));
+                        var result1 = await response1.Content.ReadAsStringAsync();
+                        if (!response1.IsSuccessStatusCode) notSavedCount++;
+                    }
+
+                    await Task.Delay(100);
+                }
+
+                if (notSavedCount > 0)
+                    saveResult = $"Note Saved Items {notSavedCount}";
+                else
+                    saveResult = "Saved";
+            }
+            catch (Exception ex)
+            {
+                saveResult = "Error";
+            }
+
+            StateHasChanged();
+        }
+        else if (table == "paudit")
+        {
+            var dataToSave = JsonSerializer.Deserialize<ProductsResponseOld>(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+
+            var items = dataToSave.Items.OrderBy(x => x.Id).ToList();
+
+            foreach (var auditProducts in AuditProducts)
+            {
+                decimal amount = auditProducts.Value.Sum(x => x.Difference * x.SellPrice);
+                decimal discountPercentage = 0;
+
+                List<OperationProductRequest> productsRequest = auditProducts.Value.Select(x =>
+                {
+                    long fact = 0;
+
+                    var first = items.FirstOrDefault(r => r.Name.Trim() == x.ProductName.Trim());
+
+                    if (first is not null)
+                    {
+                        fact = first.StoreRemains.Count() == 0 ? 0 : first.StoreRemains[auditProducts.Key];
+                    }
+
+                    return new OperationProductRequest
+                    {
+                        ProductId = x.Id,
+                        Code = x.Code,
+                        Name = x.ProductName,
+                        Unit = x.Unit,
+                        Manufacturer = x.Manufacturer,
+                        Quantity = (int)fact,
+                        Price = x.SellPrice,
+                        BuyPrice = x.BuyPrice,
+                        SellPrice = x.SellPrice,
+                        Difference = (int)fact
+                    };
+                }).ToList();
+
+                var addRequest = new CreateOperationRequest(new DateTime(2026, 2, 2).ToString("ddMMyyyyHHmm"), amount, discountPercentage, 6, auditProducts.Key, 0, string.Empty, productsRequest);
+
+                var response = await client.PostAsync(ApiEndpoints.V1.Operations.Create, addRequest.ToStringContent());
+                var result = await response.Content.ReadAsStringAsync();
+            }
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    public record AuthResult(string Name, string Role, string Token);
+
+    public class Agent 
+    {
+        public long Id { get; set; }
+        public string Name { get; set; }
+        public string Phone { get; set; }
+        public string? Address { get; set; }
+        public string? Comment { get; set; }
+        public DateTime CreateDate { get; set; }
+        public DateTime? DeleteDate { get; set; }
+        public decimal? Dolg { get; set; } = 0;
+        public long ManagerId { get; set; }
+    }
+
+    // public class StoresResponseOld
+    // {
+    //     public required IEnumerable<StoreResponseOld> Items { get; init; } = Enumerable.Empty<StoreResponseOld>();
+    // }
+    PagedRequest pagedRequest = new();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        pagedRequest.Filter = $"(Type,6)";
+        var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+        var response = await client.GetAsync($"{ApiEndpoints.V1.Operations.GetAll}?{pagedRequest.ToQuery()}");
+
+        var result = await response.Content.ReadFromJsonAsync<AuditProductsResponse>(options);
+
+        if (response.IsSuccessStatusCode && result is not null)
+        {
+            var _products = result.Products;
+            for (long i = 6; i < 7; i++)
+            {
+                AuditProducts[i] = _products.Select(x =>
+                {
+                    var storeRemains = x.StoresRemains.FirstOrDefault(r => r.Key == i);
+                    var value = storeRemains.Equals(default(KeyValuePair<long, decimal>))
+                    ? 0
+                    : storeRemains.Value;
+
+                    return new OperationProductResponse
+                        {
+                            Id = x.Id,
+                            Code = x.Code,
+                            BuyPrice = x.BuyPrice,
+                            SellPrice = x.SellPrice,
+                            Manufacturer = x.Manufacturer,
+                            ProductName = x.Name,
+                            ProductId = x.Id,
+                            Plan = value,
+                            Fact = value,
+                            Unit = x.Unit
+                        };
+                }).ToList();
+            }
+        }
+
+        var agentsResponse = await client.GetAsync($"{ApiEndpoints.V1.Agents.GetAll}?page=1&pagesize=10000");
+
+        var agentsResult = await agentsResponse.Content.ReadFromJsonAsync<AgentsResponse>(options);
+
+        if (agentsResponse.IsSuccessStatusCode && agentsResult is not null)
+        {
+            AgentsItems = agentsResult.Items;
+        }
+    }
+}

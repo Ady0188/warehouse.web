@@ -1,0 +1,614 @@
+﻿@page "/operations/{kind}"
+
+@inject HttpClient client
+@inject IJSRuntime JSRuntime
+
+@attribute [Authorize(Roles = "Admin,User")]
+
+<PageContent Title=@Title @ref=pageContent FilterExpanded=@_filterExpanded OnApplyFilter="ApplyFilter" OnResetFilter="ResetFilter">
+    <ActionBar>
+        <MudButton Variant=@filterVariant Size="Size.Small" Color="Color.Info" StartIcon=@Icons.Material.Filled.FilterAlt OnClick=@(() => _filterExpanded = true)>Фильтр</MudButton>
+        <MudButton Variant=Variant.Outlined Size="Size.Small" Color="Color.Info" StartIcon=@Icons.Custom.FileFormats.FileExcel OnClick=@ExportToExcel Disabled=!canExport>Экспорт в Excel</MudButton>
+        <AuthorizeView Roles="User">
+            @if (type == OperationType.Send)
+            {
+                <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" StartIcon=@Icons.Material.Filled.CallMade OnClick="OpenAddDialogAsync">Отправить</MudButton>
+            }
+            else if (type == OperationType.Receive)
+            {
+                <MudBadge Content=@count Color="Color.Primary" Overlap="true" Class="mx-6 my-4">
+                    <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" StartIcon=@Icons.Material.Filled.CallReceived Disabled=@(count == 0) OnClick=@(_ => count > 0 ? OpenEditDialogAsync(notReceivedList.First()) : OpenAddDialogAsync())>Получить</MudButton>
+                </MudBadge>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" StartIcon=@Icons.Material.Filled.Add OnClick="OpenAddDialogAsync">Добавить</MudButton>
+            }
+        </AuthorizeView>
+        <AuthorizeView Roles="Admin">
+            @if (type == OperationType.Receiving || type == OperationType.ReturnsToSuplier)
+            {
+                <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" StartIcon=@Icons.Material.Filled.Add OnClick="OpenAddDialogAsync">Добавить</MudButton>
+            }
+        </AuthorizeView>
+    </ActionBar>
+    <FilterBar>
+        <MudGrid Style="padding: 0 0 10px 0;">
+            <MudItem xs="1">
+                <MudNumericField @bind-Value=@filter.Code Label="Код" Clearable />
+            </MudItem>
+            <MudItem xs="3">
+                @* <PeriodFilter PeriodChanged="OnPeriodChanged" ResetToToday=_resetToToday /> *@
+                <MonthPicker PastYears="pastYears" PeriodChanged="OnPeriodChanged" ResetToToday=_resetToToday />
+                @* <MudDateRangePicker Label="Период" DateFormat="dd.MM.yyyy" PickerVariant="PickerVariant.Dialog" @bind-DateRange="@filter.DateRange" Margin="Margin.Dense" /> *@
+            </MudItem>
+            @if (type != OperationType.Send && type != OperationType.Receive)
+            {
+                <MudItem xs="2">
+                    <MyMudSelect TItem="long" @bind-Value=@filter.StoreId Label="Склад" Items=@stores Clearable Dense />
+                </MudItem>
+                <MudItem xs="3">
+                    <MyMudSelect TItem="long" @bind-Value=@filter.ManagerId Label="Менеджер" Items=@_managers Clearable Dense />
+                </MudItem>
+                <MudItem xs="3">
+                    <MyMudSelect TItem="long" @bind-Value=@filter.AgentId Label="Контрагент" Items=@_agents Searchable Clearable Dense />
+                </MudItem>
+            }
+            else if (type == OperationType.Send || type == OperationType.Receive)
+            {
+                <MudItem xs="3">
+                    <MyMudSelect TItem="long" @bind-Value=@filter.StoreId Label="Со склада" Items=@_fromStores Clearable Dense />
+                </MudItem>
+                <MudItem xs="3">
+                    <MyMudSelect TItem="long" @bind-Value=@filter.ToStoreId Label="На склад" Items=@_toStores Clearable Dense />
+                </MudItem>
+            }
+        </MudGrid>
+    </FilterBar>
+    <ChildContent>
+        <MudTable ServerData="ServerReload" Dense="true" Hover="true" Striped="true" @ref=table RowStyleFunc="new Func<OperationResponse, int, string>(GetRowStyle)">
+            <HeaderContent>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    <MudTh><MudTableSortLabel SortLabel=@col.PropertyName T="OperationResponse" Style=@col.Style>@col.Title</MudTableSortLabel></MudTh>
+                }
+                <MudTh Style="width: 100px;"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    @if (col.PropertyName == nameof(OperationResponse.Code))
+                    {
+                        <MudTd>@context.Code.ToString().PadLeft(6, '0')</MudTd>
+                    }
+                    else
+                    {
+                        <MudTd>@GetValue(context, col.PropertyName, col.StringFormat)</MudTd>
+                    }
+                }
+                <MudTd>
+                    <MudStack Row=true AlignItems=AlignItems.Center Style="width: 100%;">
+                        <AuthorizeView Roles="User" Context="cont">
+                            @if (type != OperationType.Receive)
+                            {
+                                <ActionButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Tooltip="Редактировать" OnClick=@(() => OpenEditDialogAsync(context)) />
+                            }
+                        </AuthorizeView>
+                        <AuthorizeView Roles="Admin" Context="cont">
+                            @if (type == OperationType.Receiving || type == OperationType.ReturnsToSuplier)
+                            {
+                                <ActionButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Tooltip="Редактировать" OnClick=@(() => OpenEditDialogAsync(context)) />
+                            }
+                        </AuthorizeView>
+                        <ActionButton Icon="@Icons.Material.Filled.Print" Color="Color.Secondary" Tooltip="Печать" OnClick=@(() => OnPrintAsync(context)) />
+                        @if (type != OperationType.Receive)
+                        {
+                            <ActionButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Tooltip="Удалить" OnClick=@(() => OnDeleteAsync(context)) />
+                        }
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <FooterContent>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    if (col.PropertyName == nameof(OperationResponse.Amount))
+                    {
+                        <MudTh>@Math.Round(productsAmount, 2)</MudTh>
+                    }
+                    else if (col.PropertyName == nameof(OperationResponse.Discount))
+                    {
+                        <MudTh>@Math.Round(productsDiscount, 2)</MudTh>
+                    }
+                    else if (col.PropertyName == nameof(OperationResponse.ToPay))
+                    {
+                        <MudTh>@Math.Round(productsToPay, 2)</MudTh>
+                    }
+                    else if ((type == OperationType.Send || type == OperationType.Receive) && col.PropertyName == nameof(OperationResponse.Amount))
+                    {
+                        <MudTh>@Math.Round(productsToPay, 2)</MudTh>
+                    }
+                    else
+                    {
+                        <MudTh></MudTh>
+                    }
+                }
+                <MudTh Style="width: 100px;"></MudTh>
+            </FooterContent>
+            <NoRecordsContent>
+                <MudText>Нет данных, соответствующих фильтру</MudText>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Загрузка...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+            </PagerContent>
+        </MudTable>
+    </ChildContent>
+</PageContent>
+
+
+@code {
+    [Parameter] public string? kind { get; set; }
+    private bool IsReceipts => string.Equals(kind, "receipts", StringComparison.OrdinalIgnoreCase);
+    private string Title => GetTitle(kind);
+
+    OperationType type => GetType(kind);
+
+    bool _filterExpanded = false;
+    FilterModel filter = new();
+    Variant filterVariant = Variant.Outlined;
+    private DateRange _dateRange { get; set; }
+    string filterString = string.Empty;
+
+    bool canExport;
+
+    private async Task ApplyFilter()
+    {
+        filterString = filter.ToString();
+
+        await table.ReloadServerData();
+
+        _filterExpanded = false;
+        filterVariant = filter.IsEmpty ? Variant.Outlined : Variant.Filled;
+    }
+
+    bool _resetToToday { get; set; }
+
+    private async Task ResetFilter()
+    {
+        filter = new();
+
+        _resetToToday = true;
+        await Task.Delay(1);
+        _resetToToday = false;
+
+        await ApplyFilter();
+    }
+
+    string GetTitle(string? path)
+    {
+        if (string.Equals(kind, "send", StringComparison.OrdinalIgnoreCase))
+            return "Отправка";
+        else if (string.Equals(kind, "receive", StringComparison.OrdinalIgnoreCase))
+            return "Получение";
+        else if (string.Equals(kind, "receiving", StringComparison.OrdinalIgnoreCase))
+            return "Приемки";
+        else if (string.Equals(kind, "returntosuplier", StringComparison.OrdinalIgnoreCase))
+            return "Возвраты поставщикам";
+        else if (string.Equals(kind, "shipments", StringComparison.OrdinalIgnoreCase))
+            return "Отгрузки";
+
+        return "Возвраты покупателей";
+    }
+
+    OperationType GetType(string? path)
+    {
+        if (string.Equals(kind, "send", StringComparison.OrdinalIgnoreCase))
+            return OperationType.Send;
+        else if (string.Equals(kind, "receive", StringComparison.OrdinalIgnoreCase))
+            return OperationType.Receive;
+        else if (string.Equals(kind, "receiving", StringComparison.OrdinalIgnoreCase))
+            return OperationType.Receiving;
+        else if (string.Equals(kind, "returntosuplier", StringComparison.OrdinalIgnoreCase))
+            return OperationType.ReturnsToSuplier;
+        else if (string.Equals(kind, "shipments", StringComparison.OrdinalIgnoreCase))
+            return OperationType.Shipments;
+
+        return OperationType.BuyerReturn;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (table is not null && (string.Equals(kind, "send", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(kind, "receive", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(kind, "receiving", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(kind, "returntosuplier", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(kind, "shipments", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(kind, "buyerreturn", StringComparison.OrdinalIgnoreCase)))
+        {
+            Columns = await LocalStorage.GetOperationColumns(type);
+
+            await ResetFilter();
+        }
+    }
+
+    int pastYears;
+
+    private async Task OnPeriodChanged(Period period)
+    {
+        filter.DateRange = new DateRange(period.Start, period.End);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Columns = await LocalStorage.GetOperationColumns(type);
+        filterString = filter.ToString();
+        pastYears = DateTime.Now.Year - 2025;
+    }
+
+    private string GetRowStyle(OperationResponse p, int row)
+    {
+        if (p.Type == (int)OperationType.Send && p.IsReceived)
+            return "background-color:#c8e6c9; color:#2e7d32;";
+        else if (p.Type == (int)OperationType.Send && !p.IsReceived)
+            return "background-color:#ffebee; color:#d32f2f;";
+
+        return "";
+    }
+
+    bool IsLoading;
+    private MudTable<OperationResponse> table;
+
+    private List<OperationResponse> notReceivedList = new();
+
+    int count => notReceivedList.Count();
+
+    PageContent pageContent;
+    MudMessageBox _messageBox => pageContent.MessageBox;
+
+    List<StoreResponse> storeList = new();
+    Dictionary<long, string> stores = new();
+    Dictionary<long, string> toStores = new();
+    List<AgentResponse> agents = new();
+    List<ProductResponse> products = new();
+    long productsCount;
+    decimal productsAmount;
+    decimal productsDiscount;
+    decimal productsToPay;
+
+    Dictionary<long, string> _fromStores => filter.ToStoreId.HasValue ? stores.Where(x => x.Key != filter.ToStoreId.Value).ToDictionary() : stores;
+    Dictionary<long, string> _toStores => filter.StoreId.HasValue ? toStores.Where(x => x.Key != filter.StoreId.Value).ToDictionary() : toStores;
+    Dictionary<long, string> _managers => filter.StoreId.HasValue ? storeList.First(x => x.Id == filter.StoreId.Value).Managers.ToDictionary(x => x.Id, x => $"{x.Lastname} {x.Firstname}".Trim()) : new Dictionary<long, string>();
+    Dictionary<long, string> _agents => filter.ManagerId.HasValue ? agents.Where(x => x.ManagerId == filter.ManagerId.Value).ToDictionary(x => x.Id, x => x.Name) : new Dictionary<long, string>();
+
+    DialogOptions dialogOptions => new() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false };
+
+    object? GetValue(object obj, string propertyName, string? stringFormat = null)
+    {
+        var prop = obj.GetType().GetProperty(propertyName);
+        var value = prop?.GetValue(obj);
+
+        if (value is null)
+            return null;
+
+        if (!string.IsNullOrEmpty(stringFormat))
+        {
+            if (value is IFormattable formattable)
+                return formattable.ToString(stringFormat, null);
+        }
+
+        return value;
+    }
+
+    List<ColumnDefinition> Columns;
+
+    private async Task OnDeleteAsync(OperationResponse operationResponse)
+    {
+        var message = await _messageBox.ShowAsync();
+
+        if (message is not null)
+        {
+            var response = await client.DeleteAsync($"{ApiEndpoints.V1.Operations.Create}/{operationResponse.Id}");
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                await table.ReloadServerData();
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private async Task OpenEditDialogAsync(OperationResponse operationResponse)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<AddOrEditOperationDialog>
+        {
+            { x => x.Title, Title },
+            { x => x.Operation, operationResponse },
+            { x => x.Stores, stores },
+            { x => x.ToStores, toStores },
+            { x => x.Agents, agents },
+            { x => x.OperationType, type },
+            { x => x.Products, products },
+            { x => x.IsEdit, true }
+        };
+
+        var dialog = await DialogService.ShowAsync<AddOrEditOperationDialog>("Редактировать", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    private async Task OnPrintAsync(OperationResponse operationResponse)
+    {
+        HttpResponseMessage? response;
+        if (type == OperationType.Send || type == OperationType.Receive)
+        {
+            response = await client.GetAsync($"{ApiEndpoints.V1.Reports.Get}/print/MovementReport/{operationResponse.Id}");
+        }
+        else
+        {
+            response = await client.GetAsync($"{ApiEndpoints.V1.Reports.Get}/print/NakladnoyReport/{operationResponse.Id}");
+        }
+
+
+        if (response is not null && response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadAsStringAsync();
+
+            var fileName = JsonSerializer.Deserialize<string>(result);
+            await PrintingService.Print(fileName);
+        }
+    }
+
+    // async Task<Dictionary<string, string>> GetDataToReport(OperationResponse toPrint)
+    // {
+    //     Dictionary<string, string> values = new Dictionary<string, string>();
+
+    //     var debtsResponse = await client.GetAsync($"{ApiEndpoints.V1.Agents.GetAllDebts}/{toPrint.AgentId}/{toPrint.Date.ToString("ddMMyyHHmmss")}");
+
+    //     if (debtsResponse.IsSuccessStatusCode)
+    //     {
+    //         var response = await debtsResponse.Content.ReadAsStringAsync();
+
+    //         var debts = response.Deserialize<AgentDebtsResponse>();
+
+    //         string debtTitle = "қарз";
+    //         var agentRemaind = debts.DebtOnEnd;
+    //         if (agentRemaind < 0)
+    //             debtTitle = "пешпардохт";
+
+    //         string debtAtEndTitle = "қарз";
+
+    //         var agentDebt = debts.Debt;
+    //         var agentCredit = debts.Credit;
+
+    //         if (agentDebt - agentCredit < 0)
+    //             debtAtEndTitle = "пешпардохт";
+
+    //         var docSum = toPrint.Goods.Sum(x => x.Amount);
+    //         var docDiscount = toPrint.Goods.Sum(x => x.Discount);
+    //         var docTotal = docSum - docDiscount;
+    //         var debt = agentRemaind;
+    //         var debtAtEnd = debt + docTotal * -1 * toPrint.Type.ForMultple() - toPrint.Paid;
+
+    //         values.Add("[Number]", toPrint.Code.ToString().PadLeft(6, '0'));
+    //         values.Add("[DateTime]", toPrint.Date.ToString("dd.MM.yyyy HH:mm"));
+    //         values.Add("[Store]", toPrint.StoreName);
+    //         values.Add("[Manager]", toPrint.Agent.ManagerName);
+    //         values.Add("[ManagerPhone]", toPrint.Agent.ManagerPhone);
+    //         values.Add("[Agent]", toPrint.AgentName);
+    //         values.Add("[Address]", toPrint.Agent.Address);
+    //         values.Add("[AgentPhone]", toPrint.Agent.Phone);
+    //         values.Add("[Total]", docSum.ToString("F2"));
+    //         values.Add("[Discount]", docDiscount.ToString("F2"));
+    //         values.Add("[AfterDiscount]", docTotal.ToString("F2"));
+    //         values.Add("[Paid]", toPrint.Paid.ToString("F2"));
+    //         values.Add("[Debt]", debt.ToString("F2"));
+    //         values.Add("[TotalDebt]", debtAtEnd.ToString("F2"));
+    //         values.Add("[DebtTitle]", debtTitle);
+    //         values.Add("[TotalDebtTitle]", debtAtEndTitle);
+
+    //         var table = new Dictionary<int, List<dynamic>>();
+
+    //         foreach (var item in toPrint.Goods.OrderBy(x => x.GoodsInfoName))
+    //         {
+    //             table.Add(table.Count(), new List<dynamic> {
+    //             table.Count() + 1,
+    //             item.Maker,
+    //             item.GoodsInfoName,
+    //             item.Count,
+    //             item.SellPrice.ToString("F2"),
+    //             item.Amount.ToString("F2") });
+    //         }
+    //         values.Add("table", JsonSerializer.Serialize(table));
+    //     }
+
+    //     return values;
+    // }
+
+    private async Task OpenAddDialogAsync()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<AddOrEditOperationDialog>
+        {
+            { x => x.Title, Title },
+            { x => x.Stores, stores },
+            { x => x.ToStores, toStores },
+            { x => x.Agents, agents },
+            { x => x.Products, products },
+            { x => x.OperationType, type }
+        };
+
+        var dialog = await DialogService.ShowAsync<AddOrEditOperationDialog>("Добавить", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    async Task ExportToExcel()
+    {
+        var response = await client.GetAsync($"{ApiEndpoints.V1.Operations.Export}?{pagedRequest.ToQuery()}&operationtype={(int)type}");
+
+        var contentDisposition = response.Content.Headers.ContentDisposition;
+
+        var fileName = contentDisposition?.FileNameStar ??
+                       contentDisposition?.FileName ??
+                       "template";
+
+        var fileBytes = await response.Content.ReadAsByteArrayAsync();
+        var fileContent = Convert.ToBase64String(fileBytes);
+        var url = $"data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{fileContent}";
+
+        await JSRuntime.InvokeVoidAsync("downloadFile", url, fileName);
+    }
+
+    PagedRequest pagedRequest = new();
+    private async Task<TableData<OperationResponse>> ServerReload(TableState state, CancellationToken token)
+    {
+        IsLoading = true;
+        StateHasChanged();
+        pagedRequest.Filter = $"(Type,{(int)type})";
+
+        if (!string.IsNullOrEmpty(filterString))
+        {
+            pagedRequest.Filter += $"and{filterString}";
+        }
+
+        if (pagedRequest.ResetPage)
+        {
+            pagedRequest.ResetPage = false;
+
+            if (state.Page != 0)
+                table.NavigateTo(0);
+        }
+
+        pagedRequest.Refresh(state);
+
+        string content = string.Empty;
+        try
+        {
+            canExport = false;
+            var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+            // var remainsResponse = await client.GetAsync(ApiEndpoints.V1.Reports.Remains, token);
+            // var remainsResult = await remainsResponse.Content.ReadFromJsonAsync<RemainsesResponse>();
+
+            var response = await client.GetAsync($"{ApiEndpoints.V1.Operations.GetAll}?{pagedRequest.ToQuery()}&operationtype={(int)type}", token);
+            content = await response.Content.ReadAsStringAsync();
+
+            var result = await response.Content.ReadFromJsonAsync<OperationsResponse>(options);
+
+            if (response.IsSuccessStatusCode && result is not null)
+            {
+                productsCount = result.TotalProductCount;
+                productsAmount = result.TotalProductAmount;
+                productsDiscount = result.TotalProductDiscount;
+                productsToPay = result.TotalProductToPay;
+                products = result.Products;
+                storeList = result.Stores;
+                stores = result.Stores.ToDictionary(s => s.Id, s => s.Name);
+                toStores = result.ToStores.ToDictionary(s => s.Id, s => s.Name);
+                agents = result.Agents;
+                notReceivedList = result.NotResivedItems;
+
+                canExport = result.Total > 0;
+
+                return new TableData<OperationResponse>
+                    {
+                        TotalItems = result.Total,
+                        Items = result.Items
+                    };
+            }
+        }
+        catch (JsonException ex)
+        {
+            if (ex.Message.StartsWith("'<' is an invalid start of a value"))
+            {
+                Nav.NavigateTo(Nav.Uri, forceLoad: true);
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+
+            StateHasChanged();
+        }
+
+        return await Task.FromResult(new TableData<OperationResponse>
+            {
+                Items = new List<OperationResponse>()
+            });
+    }
+
+    public class FilterModel
+    {
+        public DateRange DateRange { get; set; }
+        public long? Code { get; set; }
+        public string? FromDate { get; set; }
+        public string? ToDate { get; set; }
+        public long? StoreId { get; set; }
+        public long? ManagerId { get; set; }
+        public long? ToStoreId { get; set; }
+        public long? AgentId { get; set; }
+
+        public FilterModel()
+        {
+            var endDate = DateTime.Now;
+            var statrtDate = new DateTime(endDate.Year, endDate.Month, 1);
+            DateRange = new DateRange(statrtDate, endDate);
+        }
+
+        public bool IsEmpty => (!DateRange.Start.HasValue || DateRange.Start.Value.Date == (new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1)).Date) &&
+                   (!DateRange.End.HasValue || DateRange.End.Value.Date == DateTime.Now.Date) &&
+                   !Code.HasValue &&
+                   !StoreId.HasValue &&
+                   !ManagerId.HasValue &&
+                   !ToStoreId.HasValue &&
+                   !AgentId.HasValue;
+
+        public override string ToString()
+        {
+            FromDate = DateRange.Start is not null ? DateRange.Start.Value.ToString("ddMMyyyy") : null;
+            ToDate = DateRange.End is not null ? DateRange.End.Value.ToString("ddMMyyyy") : null;
+
+            List<string> result = new List<string>();
+
+            if (!string.IsNullOrEmpty(FromDate))
+                result.Add($"(FromDate,{FromDate})");
+            if (!string.IsNullOrEmpty(ToDate))
+                result.Add($"(ToDate,{ToDate})");
+            if (Code.HasValue)
+                result.Add($"(Code,{Code})");
+            if (StoreId.HasValue)
+                result.Add($"(StoreId,{StoreId})");
+            if (ManagerId.HasValue)
+                result.Add($"(ManagerId,{ManagerId})");
+            if (ToStoreId.HasValue)
+                result.Add($"(ToStoreId,{ToStoreId})");
+            if (AgentId.HasValue)
+                result.Add($"(AgentId,{AgentId})");
+
+            return string.Join("and", result);
+        }
+    }
+}

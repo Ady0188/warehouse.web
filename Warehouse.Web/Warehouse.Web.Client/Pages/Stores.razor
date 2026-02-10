@@ -1,0 +1,193 @@
+﻿@page "/stores"
+
+@inject HttpClient client
+
+@attribute [Authorize(Roles = "Admin")]
+
+<PageContent Title="Склады" @ref=pageContent>
+    <ActionBar>
+        <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" StartIcon=@Icons.Material.Filled.Add OnClick="OpenAddDialogAsync">Добавить</MudButton>
+    </ActionBar>
+    <ChildContent>
+        <MudTable ServerData="ServerReload" Dense="true" Hover="true" Striped="true" @ref=table>
+            <HeaderContent>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    <MudTh><MudTableSortLabel SortLabel=@col.PropertyName T="StoreResponse" Style=@col.Style>@col.Title</MudTableSortLabel></MudTh>
+                }
+                <MudTh Style="width: 100px;"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @foreach (var col in Columns.Where(c => c.Visible))
+                {
+                    <MudTd>@GetValue(context, col.PropertyName, col.StringFormat)</MudTd>
+                }
+                <MudTd>
+                    <MudStack Row=true AlignItems=AlignItems.Center Style="width: 100%;">
+                        <ActionButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Tooltip="Редактировать" OnClick=@(() => OpenEditDialogAsync(context)) />
+                        <ActionButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Tooltip="Удалить" OnClick=@(() => OnDeleteAsync(context)) />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Нет данных, соответствующих фильтру</MudText>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Загрузка...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+            </PagerContent>
+        </MudTable>
+    </ChildContent>
+</PageContent>
+
+@code {
+    private string _buttonText = "ФИО";
+    bool IsLoading;
+    private MudTable<StoreResponse> table;
+
+    PageContent pageContent;
+    MudMessageBox _messageBox => pageContent.MessageBox;
+
+    DialogOptions dialogOptions => new() { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false };
+
+    object? GetValue(object obj, string propertyName, string? stringFormat = null)
+    {
+        var prop = obj.GetType().GetProperty(propertyName);
+        var value = prop?.GetValue(obj);
+
+        if (value is null)
+            return null;
+
+        if (!string.IsNullOrEmpty(stringFormat))
+        {
+            if (value is IFormattable formattable)
+                return formattable.ToString(stringFormat, null);
+        }
+
+        return value;
+    }
+
+    List<ColumnDefinition> Columns;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Columns = await LocalStorage.GetStoreColumns();
+    }
+
+    private async Task OnDeleteAsync(StoreResponse storeResponse)
+    {
+        var message = await _messageBox.ShowAsync();
+
+        if (message is not null)
+        {
+            var response = await client.DeleteAsync($"{ApiEndpoints.V1.Stores.Create}/{storeResponse.Id}");
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                await table.ReloadServerData();
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private async Task OpenEditDialogAsync(StoreResponse storeResponse)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<AddOrEditStoreDialog>
+        {
+            { x => x.Store, storeResponse },
+            { x => x.IsEdit, true }
+        };
+
+        var dialog = await DialogService.ShowAsync<AddOrEditStoreDialog>("Редактировать", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    private async Task OpenAddDialogAsync()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<AddOrEditStoreDialog>();
+
+        var dialog = await DialogService.ShowAsync<AddOrEditStoreDialog>("Добавить", parameters, dialogOptions);
+
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    PagedRequest pagedRequest = new();
+    private async Task<TableData<StoreResponse>> ServerReload(TableState state, CancellationToken token)
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        if (pagedRequest.ResetPage)
+        {
+            pagedRequest.ResetPage = false;
+
+            if (state.Page != 0)
+                table.NavigateTo(0);
+        }
+
+        pagedRequest.Refresh(state);
+
+        string content = string.Empty;
+        try
+        {
+            var response = await client.GetAsync($"{ApiEndpoints.V1.Stores.GetAll}?{pagedRequest.ToQuery()}", token);
+            content = await response.Content.ReadAsStringAsync();
+
+            var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+            var result = await response.Content.ReadFromJsonAsync<StoresResponse>(options);
+
+            if (response.IsSuccessStatusCode && result is not null)
+            {
+                return new TableData<StoreResponse>
+                    {
+                        TotalItems = result.Total,
+                        Items = result.Items
+                    };
+            }
+        }
+        catch (JsonException ex)
+        {
+            if (ex.Message.StartsWith("'<' is an invalid start of a value"))
+            {
+                Nav.NavigateTo(Nav.Uri, forceLoad: true);
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+
+            StateHasChanged();
+        }
+
+        return await Task.FromResult(new TableData<StoreResponse>
+            {
+                Items = new List<StoreResponse>()
+            });
+    }
+}

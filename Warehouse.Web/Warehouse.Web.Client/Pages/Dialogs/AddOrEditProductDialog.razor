@@ -1,0 +1,148 @@
+﻿@using System.Text.Json
+@using System.Text
+@inject HttpClient client
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form">
+            <MudGrid Style="padding: 0 0 10px 0;">
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@name Label="Наименования" Required="true" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value=@manufacturer Label="Производитель" Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudSelect @bind-Value="unit" Label="Ед. изм." Required="true" Clearable>
+                        @foreach (var _unit in Units)
+                        {
+                            <MudSelectItem Value="_unit">@_unit</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value=@buyPrice Label="Цена закупки" Required Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value=@sellPrice Label="Цена продажи" Required Clearable />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value=@limit Label="Лимит" Required Clearable />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="Reset">Сбросить</MudButton>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Сохранить</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public ProductResponse Product { get; set; }
+
+    public List<string> Units { get; set; }
+
+    [Parameter]
+    public bool IsEdit { get; set; }
+
+    private MudForm form;
+
+    string? name;
+    string? manufacturer;
+    string? unit;
+    decimal? buyPrice;
+    decimal? sellPrice;
+    int limit;
+
+    private async Task Submit()
+    {
+        await form.Validate();
+
+        if (!form.IsValid)
+        {
+            return;
+        }
+
+        bool isSubmitSuccess = false;
+        if (IsEdit)
+        {
+            var updateRequest = new UpdateProductRequest(name!, manufacturer, unit!, buyPrice!.Value, sellPrice!.Value, limit);
+
+            var response = await client.PutAsync($"{ApiEndpoints.V1.Products.Create}/{Product.Id}", updateRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+        else
+        {
+            var addRequest = new CreateProductRequest(name!, manufacturer, unit!, buyPrice!.Value, sellPrice!.Value, limit);
+
+            var response = await client.PostAsync(ApiEndpoints.V1.Products.Create, addRequest.ToStringContent());
+            
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    };
+
+                var result = await response.Content.ReadFromJsonAsync<ErrorResponse>(options);
+                
+                Snackbar.Info(result?.Errors.GeneralErrors?[0] ?? "Данные уже существуют");
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Reset()
+    {
+        name = default;
+        manufacturer = default;
+        unit = default;
+        buyPrice = default;
+        sellPrice = default;
+        limit = 0;
+    }
+
+    protected override void OnInitialized()
+    {
+        Units = new List<string> { "шт", "лист", "блок" };
+        if (IsEdit)
+        {
+            name = Product.Name;
+            manufacturer = Product.Manufacturer;
+            unit = Product.Unit;
+            buyPrice = Product.BuyPrice;
+            sellPrice = Product.SellPrice;
+            limit = Product.LimitRemain;
+        }
+        else
+        {
+            Reset();
+            unit = Units.First();
+        }
+    }
+}

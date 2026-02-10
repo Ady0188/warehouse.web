@@ -1,0 +1,217 @@
+﻿@typeparam TItem where TItem : struct
+
+@if (Searchable)
+{
+    <MudAutocomplete T="string"
+                     Value="stringValue"
+                     ValueChanged=@OnSearchValueChanged
+                     Label="@Label"
+                     Placeholder="@Placeholder"
+                     Disabled="@Disabled"
+                     Dense="@Dense"
+                     Clearable="@Clearable"
+                     Class="@Class"
+                     Style="@Style"
+                     SearchFunc="SearchFunc"
+                     Required="@Required"
+                     Immediate=true
+                     MaxItems="50"
+                     Modal=true />
+}
+else
+{
+    <MudSelect T="TItem ?"
+               Value="Value"
+               ValueChanged="OnValueChanged"
+               Label="@Label"
+               Placeholder="@Placeholder"
+               Required="@Required"
+               Clearable="@Clearable"
+               Disabled="@Disabled"
+               Dense="@Dense"
+               Immediate="@Immediate"               
+               FullWidth="@FullWidth"
+               OpenIcon="@OpenIcon"
+               CloseIcon="@CloseIcon"
+               Class="@Class"
+               Style="@Style">
+
+        @foreach (var item in Items)
+        {
+            <MudSelectItem T="TItem ?" Value="@item.Key">
+                @item.Value
+            </MudSelectItem>
+        }
+    </MudSelect>
+}
+
+@code {
+    // === Основное ===
+    [Parameter] public TItem? Value { get; set; }
+    [Parameter] public EventCallback<TItem?> ValueChanged { get; set; }
+
+    // Словарь: ключ = значение (Id), строка = текст
+    [Parameter] public Dictionary<TItem, string> Items { get; set; } = new();
+
+    // === Режим поиска ===
+    [Parameter] public bool Searchable { get; set; } = false;
+
+    /// <summary>Кастомный предикат поиска, если нужно переопределить логику.</summary>
+    [Parameter]
+    public Func<string, KeyValuePair<TItem, string>, bool>? SearchPredicate { get; set; }
+
+    // === Текст / оформление ===
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string Placeholder { get; set; } = string.Empty;
+    [Parameter] public string Class { get; set; } = string.Empty;
+    [Parameter] public string Style { get; set; } = string.Empty;
+
+    // === Поведение ===
+    [Parameter] public bool Required { get; set; } = false;
+    [Parameter] public bool Clearable { get; set; } = false;
+    [Parameter] public bool Disabled { get; set; } = false;
+    [Parameter] public bool Dense { get; set; } = false;
+    [Parameter] public bool FullWidth { get; set; } = false;
+    [Parameter] public bool Immediate { get; set; } = false;
+    [Parameter] public bool DisableUnderline { get; set; } = false;
+
+    // === Визуальные параметры ===
+    [Parameter] public Variant Variant { get; set; } = Variant.Text;
+    [Parameter] public Margin Margin { get; set; } = Margin.Dense;
+
+    [Parameter] public Adornment Adornment { get; set; } = Adornment.None;
+    [Parameter] public string AdornmentIcon { get; set; } = string.Empty;
+
+    [Parameter] public string OpenIcon { get; set; } = Icons.Material.Filled.ArrowDropDown;
+    [Parameter] public string CloseIcon { get; set; } = Icons.Material.Filled.ArrowDropUp;
+
+    protected override void OnParametersSet()
+    {
+        stringValue = Value.HasValue && Items.TryGetValue(Value.Value, out var text) ? text : string.Empty;
+    }
+
+    // === Вспомогательные методы ===
+    string stringValue;
+    private Task OnSearchValueChanged(string? value)
+    {
+        var _choesen = Items.Where(x => x.Value == value);
+
+        if (string.IsNullOrEmpty(value) || _choesen is null || _choesen.Count() == 0)
+        {
+            stringValue = string.Empty;
+            Value = null;
+        }
+        else
+        {
+            stringValue = value;
+            Value = _choesen.First().Key;
+        }
+
+        return ValueChanged.InvokeAsync(Value);
+    }
+
+    private Task OnValueChanged(TItem? value)
+    {
+        Value = value;
+        return ValueChanged.InvokeAsync(value);
+    }
+
+    // Для MudAutocomplete – как показывать элемент в текстовом виде
+    private string ToItemString(TItem? value)
+    {
+        if (value.HasValue && Items.TryGetValue(value.Value, out var text))
+            return text;
+
+        return string.Empty;
+    }
+
+    // Поисковая функция для MudAutocomplete
+
+    private Task<IEnumerable<string>> SearchFunc(string value, CancellationToken _)
+    {
+        IEnumerable<string> data = Items.Values.Distinct();
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            var term = value.Trim();
+            data = Items.Where(x =>
+                x.Value.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true).Select(x => x.Value).Distinct();
+        }
+
+        // опционально ограничим выдачу
+        return Task.FromResult(data.Take(50));
+    }
+}
+
+
+@* @typeparam TItem where TItem : struct
+
+<MudSelect T="TItem?"
+           Value="Value"
+           ValueChanged="OnValueChanged"
+           Label="@Label"
+           Placeholder="@Placeholder"
+           Required="@Required"
+           Clearable="@Clearable"
+           Disabled="@Disabled"
+           Dense="@Dense"
+           Immediate="@Immediate"
+           Variant="@Variant"
+           Underline="@DisableUnderline"
+           Margin="@Margin"
+           Adornment="@Adornment"
+           AdornmentIcon="@AdornmentIcon"
+           FullWidth="@FullWidth"
+           OpenIcon="@OpenIcon"
+           CloseIcon="@CloseIcon"
+           Class="@Class"
+           Style="@Style">
+
+    @foreach (var item in Items)
+    {
+        <MudSelectItem T="TItem ?" Value="@item.Key">
+            @item.Value
+        </MudSelectItem>
+    }
+</MudSelect>
+
+@code {
+    // MAIN PARAMETERS
+    [Parameter] public TItem? Value { get; set; }
+    [Parameter] public EventCallback<TItem?> ValueChanged { get; set; }
+
+    [Parameter] public Dictionary<TItem, string> Items { get; set; } = new();
+
+    // TEXT & STYLE
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string Placeholder { get; set; } = string.Empty;
+    [Parameter] public string Class { get; set; } = string.Empty;
+    [Parameter] public string Style { get; set; } = string.Empty;
+
+    // BEHAVIOR
+    [Parameter] public bool Required { get; set; } = false;
+    [Parameter] public bool Clearable { get; set; } = false;
+    [Parameter] public bool Disabled { get; set; } = false;
+    [Parameter] public bool Dense { get; set; } = false;
+    [Parameter] public bool FullWidth { get; set; } = false;
+    [Parameter] public bool Immediate { get; set; } = false;
+    [Parameter] public bool DisableUnderline { get; set; } = false;
+
+    // VISUAL VARIANTS
+    [Parameter] public Variant Variant { get; set; } = Variant.Outlined;
+    [Parameter] public Margin Margin { get; set; } = Margin.Dense;
+
+    // ADORNMENT
+    [Parameter] public Adornment Adornment { get; set; } = Adornment.None;
+    [Parameter] public string AdornmentIcon { get; set; } = string.Empty;
+
+    // ICONS
+    [Parameter] public string OpenIcon { get; set; } = Icons.Material.Filled.ArrowDropDown;
+    [Parameter] public string CloseIcon { get; set; } = Icons.Material.Filled.ArrowDropUp;
+
+    private Task OnValueChanged(TItem? value)
+    {
+        Value = value;
+        return ValueChanged.InvokeAsync(value);
+    }
+} *@

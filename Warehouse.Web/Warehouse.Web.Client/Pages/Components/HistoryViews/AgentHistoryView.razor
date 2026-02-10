@@ -1,0 +1,47 @@
+﻿<MudGrid Style="padding: 0 0 10px 0;">
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@name Label="Наименования" Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@phone Label="Номер телефона" Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@address Label="Адрес" Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@StoreName Label="Склад" Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@ManagerName Label="Менеджер" Disabled />
+    </MudItem>
+    <MudItem xs="6">
+        <MudTextField T="string" @bind-Value=@comment Label="Коментария" Disabled />
+    </MudItem>
+</MudGrid>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public AgentResponse Agent { get; set; }
+    
+    [Parameter]
+    public string StoreName { get; set; }
+    
+    [Parameter]
+    public string ManagerName { get; set; }
+
+    string? name;
+    string? address;
+    string? phone;
+    string? comment;
+
+    protected override void OnInitialized()
+    {
+        name = Agent.Name;
+        address = Agent.Address;
+        phone = Agent.Phone;
+        comment = Agent.Comment;
+    }
+}

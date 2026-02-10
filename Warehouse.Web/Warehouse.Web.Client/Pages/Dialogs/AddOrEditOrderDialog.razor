@@ -1,0 +1,140 @@
+﻿@using System.Text.Json
+@using System.Text
+@inject HttpClient client
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form">
+            <MudGrid Style="padding: 0 0 10px 0;">
+                <MudItem xs="4">
+                    <MudDateTimePicker Label="От" @bind-Value=@date MinDate=@(new DateTime(2025, 10, 1)) MaxDate=@(DateTime.Now) />
+                </MudItem>
+                <MudItem xs="8">
+                    <MudSelect T="long?" @bind-Value="storeId" Label="Склад" Required="true" Dense Clearable>
+                        @foreach (var store in Stores)
+                        {
+                            <MudSelectItem T="long?" Value="store.Key">@store.Value</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="8">
+                    <MyMudSelect TItem="long" Label="Контрагент" @bind-Value="agentId" Items=@Agents Searchable Dense Clearable />
+                </MudItem>
+                <MudItem xs="4">
+                    <MudNumericField T="decimal" @bind-Value=@amount Label="Сумма" Required="true" Clearable />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" @bind-Value=@comment Label="Коментария" Lines="3" Clearable />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="Reset">Сбросить</MudButton>
+        <MudButton OnClick="Cancel">Закрыть</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Сохранить</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public OrderResponse Order { get; set; }
+
+    [Parameter]
+    public bool IsEdit { get; set; }
+
+    [Parameter]
+    public Dictionary<long, string> Stores { get; set; }
+
+    [Parameter]
+    public Dictionary<long, string> Agents { get; set; }
+
+    [Parameter]
+    public OrderType OrderType { get; set; }
+
+    private MudForm form;
+
+    DateTime date = DateTime.Now;
+    long? storeId;
+    long? agentId;
+    decimal amount;
+    string? comment;
+
+    private async Task Submit()
+    {
+        await form.Validate();
+
+        if (!form.IsValid)
+        {
+            return;
+        }
+
+        bool isSubmitSuccess = false;
+        if (IsEdit)
+        {
+            var updateRequest = new UpdateOrderRequest(date.ToString("ddMMyyyyHHmm"), default, storeId.Value, agentId.Value, amount, comment, (int)OrderType, null);
+
+            var response = await client.PutAsync($"{ApiEndpoints.V1.Orders.Create}/{Order.Id}", updateRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+        else
+        {
+            var addRequest = new CreateOrderRequest(date.ToString("ddMMyyyyHHmm"), default, storeId.Value, agentId.Value, amount, comment, (int)OrderType, null);
+
+            var response = await client.PostAsync(ApiEndpoints.V1.Orders.Create, addRequest.ToStringContent());
+            var result = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Success();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Error();
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Reset()
+    {
+        date = DateTime.Now;
+        storeId = default;
+        agentId = default;
+        amount = default;
+        comment = default;
+
+        if (Stores.Count() == 1)
+            storeId = Stores.First().Key;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit)
+        {
+            date = Order.Date;
+            storeId = Order.StoreId;
+            agentId = Order.AgentId;
+            amount = Order.Amount;
+            comment = Order.Comment;
+        }
+        else
+        {
+            Reset();
+        }
+    }
+}

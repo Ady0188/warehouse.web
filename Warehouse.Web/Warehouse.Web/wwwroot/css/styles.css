@@ -1,0 +1,52 @@
+﻿:root {
+    --mud-iconbutton-extra-small-size: 24px;
+    --mud-iconbutton-extra-small-padding: 4px;
+    /* Extra small sizes — подберите под свой дизайн */
+    --mud-btn-extrasmall-height: 28px;
+    --mud-btn-extrasmall-padding: 6px 10px;
+    --mud-btn-extrasmall-font-size: 0.75rem;
+    --mud-iconbtn-extrasmall-size: 24px; /* width & height */
+    --mud-iconbtn-extrasmall-font-size: 16px; /* иконка внутри */
+    --mud-iconbtn-extrasmall-padding: 2px;
+}
+
+.mud-icon-button.extra-small-icon-button {
+    width: var(--mud-iconbutton-extra-small-size);
+    height: var(--mud-iconbutton-extra-small-size);
+    min-width: var(--mud-iconbutton-extra-small-size);
+    min-height: var(--mud-iconbutton-extra-small-size);
+    font-size: 14px;
+    padding: var(--mud-iconbutton-extra-small-padding);
+}
+
+/* Для иконочной кнопки */
+.mud-icon-button.extra-small {
+    width: var(--mud-iconbtn-extrasmall-size) !important;
+    height: var(--mud-iconbtn-extrasmall-size) !important;
+    min-width: var(--mud-iconbtn-extrasmall-size) !important;
+    min-height: var(--mud-iconbtn-extrasmall-size) !important;
+    padding: var(--mud-iconbtn-extrasmall-padding) !important;
+    font-size: var(--mud-iconbtn-extrasmall-font-size) !important;
+}
+
+    /* Немного выравнивания иконки внутри (если нужно) */
+    .mud-icon-button.extra-small .mud-icon-root {
+        font-size: var(--mud-iconbtn-extrasmall-font-size) !important;
+        line-height: 1 !important;
+    }
+
+.mud-table-dense * .mud-table-row .mud-table-cell {
+    padding: 4px 20px 4px 16px;
+    padding-inline-start: 16px;
+    padding-inline-end: 20px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .mud-table-hover .mud-table-container .mud-table-root .mud-table-body .mud-table-row:hover {
+        background-color: rgb(0 125 253 / 15%) !important;
+    }
+
+    .mud-table-hover.mud-table-striped .mud-table-container .mud-table-root .mud-table-body .mud-table-row:nth-of-type(odd):hover {
+        background-color: rgb(0 125 253 / 15%) !important;
+    }
+}

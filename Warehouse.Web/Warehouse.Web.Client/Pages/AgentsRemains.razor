@@ -1,0 +1,313 @@
+﻿@page "/debts"
+
+@inject HttpClient client
+@inject IJSRuntime JSRuntime
+
+@attribute [Authorize]
+
+
+
+<PageContent Title="Долги" @ref=pageContent FilterExpanded=@_filterExpanded OnApplyFilter="ApplyFilter" OnResetFilter="ResetFilter">
+    <ActionBar>
+        <MudButton Variant=@filterVariant Size="Size.Small" Color="Color.Info" StartIcon=@Icons.Material.Filled.FilterAlt OnClick=@(() => _filterExpanded = true)>Фильтр</MudButton>
+        <MudButton Variant=Variant.Outlined Size="Size.Small" Color="Color.Info" StartIcon=@Icons.Custom.FileFormats.FileExcel OnClick=@ExportToExcel>Экспорт в Excel</MudButton>
+    </ActionBar>
+    <FilterBar>
+        <MudGrid Style="padding: 0 0 10px 0;">
+            <MudItem xs="3">
+                <MonthPicker PastYears="pastYears" PeriodChanged="OnPeriodChanged" ResetToToday=_resetToToday />
+            </MudItem>
+            <MudItem xs="3">
+                <MyMudSelect TItem="long" @bind-Value=@filter.StoreId Label="Склад" Items=@_stores Clearable Dense />
+            </MudItem>
+            <MudItem xs="3">
+                <MyMudSelect TItem="long" @bind-Value=@filter.ManagerId Label="Менеджер" Items=@_managers Searchable Clearable Dense />
+            </MudItem>
+            <MudItem xs="3">
+                <MyMudSelect TItem="long" @bind-Value=@filter.Id Label="Контрагент" Items=@_agents Searchable Clearable Dense />
+            </MudItem>
+        </MudGrid>
+    </FilterBar>
+    <ChildContent>
+        <MudTable ServerData="ServerReload" Dense="true" Hover="true" Striped="true" @ref=table CustomHeader="true" HeaderClass="table-head-bordered" Bordered="true" RowStyleFunc="new Func<AgentResponse, int, string>(GetRowStyle)">
+            <HeaderContent>
+                <MudTh Style="text-align:center;">Контрагент</MudTh>
+                <MudTh Style="text-align:center;width:150px;">Склад</MudTh>
+                <MudTh Style="text-align:center;">Менеджер</MudTh>
+                <MudTh Style="text-align:center;max-width: fit-content !important;">Остаток</MudTh>
+                <MudTh Style="text-align:center;width:90px;">Уровень</MudTh>
+                <MudTh Style="text-align:center;width:44px;"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.StoreName</MudTd>
+                <MudTd>@context.ManagerName</MudTd>
+                <MudTd><MudStack Row><span>@Math.Abs(context.Debts.DebtOnEnd)</span> <MudSpacer /> <span>@GetTitleRow(context.Debts.DebtOnEnd)</span></MudStack></MudTd>
+                <MudTd>@(context.Debts.DebtOnEnd >= 0 ? "" : context.Debts.Level)</MudTd>
+
+                <MudTd>
+                    <ActionButton Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Info" Tooltip="Оборот" OnClick=@(() => OpenTurnoverDialogAsync(context)) />
+                </MudTd>
+
+            </RowTemplate>
+            <FooterContent>
+                <MudTd></MudTd>
+                <MudTd></MudTd>
+                <MudTd></MudTd>
+                <MudTd>
+                    <MudStack>
+                        <MudStack Row><span>@Math.Abs(Math.Round(totalDebt, 2))</span> <MudSpacer /> <span>@GetTitleRow(totalDebt)</span></MudStack>
+                        <MudStack Row><span>@Math.Abs(Math.Round(totalCredit, 2))</span> <MudSpacer /> <span>@GetTitleRow(totalCredit)</span></MudStack>
+                    </MudStack>
+                </MudTd>
+                <MudTd></MudTd>
+                <MudTd></MudTd>
+            </FooterContent>
+            <NoRecordsContent>
+                <MudText>Нет данных, соответствующих фильтру</MudText>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Загрузка...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+            </PagerContent>
+        </MudTable>
+    </ChildContent>
+</PageContent>
+
+@code {
+    bool IsLoading;
+    private MudTable<AgentResponse> table;
+
+    PageContent pageContent;
+    MudMessageBox _messageBox => pageContent.MessageBox;
+
+    PagedRequest pagedRequest = new();
+
+    DialogOptions dialogOptions => new() { MaxWidth = MaxWidth.Large, FullWidth = true, BackdropClick = false };
+
+    List<StoreResponse> stores = new();
+    List<AgentResponse> agents = new();
+
+    Dictionary<long, string> _stores => stores.ToDictionary(x => x.Id, x => x.Name);
+    Dictionary<long, string> _managers => filter.StoreId.HasValue ? stores.First(x => x.Id == filter.StoreId).Managers.OrderBy(x => $"{x.Lastname} {x.Firstname}").ToDictionary(x => x.Id, x => $"{x.Lastname} {x.Firstname}".Trim()) : new Dictionary<long, string>();
+    Dictionary<long, string> _agents => filter.ManagerId.HasValue ? agents.Where(x => x.ManagerId == filter.ManagerId).OrderBy(x => x.Name).ToDictionary(x => x.Id, x => x.Name) : new Dictionary<long, string>();
+
+    decimal totalDebt;
+    decimal totalCredit;
+
+    bool _filterExpanded = false;
+    FilterModel filter = new();
+    Variant filterVariant = Variant.Outlined;
+    private DateRange _dateRange { get; set; }
+    string filterString = string.Empty;
+
+    int pastYears;
+    Period period;
+    bool _resetToToday { get; set; }
+
+    private async Task OnPeriodChanged(Period _period)
+    {
+        period = _period;
+    }
+
+    private async Task ApplyFilter()
+    {
+        filterString = filter.ToString();
+
+        await table.ReloadServerData();
+
+        _filterExpanded = false;
+        filterVariant = period.Start.Month == DateTime.Now.Month && filter.IsEmpty ? Variant.Outlined : Variant.Filled;
+    }
+
+    private async Task ResetFilter()
+    {
+        filter = new();
+
+        _resetToToday = true;
+        await Task.Delay(1);
+        _resetToToday = false;
+
+        var end = DateTime.Now;
+        var start = new DateTime(end.Year, end.Month, 1, 0, 0, 0);
+        period = new Period(start, end);
+
+        await ApplyFilter();
+    }
+
+    object? GetValue(object obj, string propertyName, string? stringFormat = null)
+    {
+        var prop = obj.GetType().GetProperty(propertyName);
+        var value = prop?.GetValue(obj);
+
+        if (value is null)
+            return null;
+
+        if (!string.IsNullOrEmpty(stringFormat))
+        {
+            if (value is IFormattable formattable)
+                return formattable.ToString(stringFormat, null);
+        }
+
+        return value;
+    }
+
+    List<ColumnDefinition> Columns;
+
+    string GetTitleRow(decimal data)
+    {
+        if (data == 0)
+        {
+            return string.Empty;
+        }
+
+        return data > 0 ? "(предоплата)" : "(долг)";
+    }
+
+    private string GetRowStyle(AgentResponse p, int row)
+    {
+        if (p.Debts.Level == 2)
+            return "background-color:#fff9c4; color:#f57f17;";
+        if (p.Debts.Level > 2)
+            return "background-color:#ffebee; color:#d32f2f;";
+
+        return "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Columns = await LocalStorage.GetProductRemainsColumns();
+        pastYears = DateTime.Now.Year - 2025;
+        var end = DateTime.Now;
+        var start = new DateTime(end.Year, end.Month, 1, 0, 0, 0);
+        period = new Period(start, end);
+    }
+
+    private async Task OpenTurnoverDialogAsync(AgentResponse productResponse)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters<AgentTurnoverDialog>
+        {
+            { x => x.AgentId, productResponse.Id },
+            { x => x.Period, period }
+        };
+
+        await DialogService.ShowAsync<AgentTurnoverDialog>($"Оборот \"{productResponse.Name}\"", parameters, dialogOptions);
+    }
+
+    async Task ExportToExcel()
+    {
+        var dateTo = period.End;
+        var dateFrom = period.Start;
+
+        var response = await client.GetAsync($"{ApiEndpoints.V1.Agents.ExportRemains}?{pagedRequest.ToQuery()}&IncludeDebts=true&DebtsFrom={dateFrom.ToString("ddMMyyyyHHmmss")}&DebtsTo={dateTo.ToString("ddMMyyyyHHmmss")}");
+
+        var contentDisposition = response.Content.Headers.ContentDisposition;
+
+        var fileName = contentDisposition?.FileNameStar ??
+                       contentDisposition?.FileName ??
+                       "template";
+
+        var fileBytes = await response.Content.ReadAsByteArrayAsync();
+        var fileContent = Convert.ToBase64String(fileBytes);
+        var url = $"data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{fileContent}";
+
+        await JSRuntime.InvokeVoidAsync("downloadFile", url, fileName);
+    }
+
+    private async Task<TableData<AgentResponse>> ServerReload(TableState state, CancellationToken token)
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+            pagedRequest.Filter = filterString;
+
+        if (pagedRequest.ResetPage)
+        {
+            pagedRequest.ResetPage = false;
+
+            if (state.Page != 0)
+                table.NavigateTo(0);
+        }
+
+        pagedRequest.Refresh(state);
+
+        string content = string.Empty;
+        try
+        {
+            var dateTo = period.End;
+            var dateFrom = period.Start;
+
+            var response = await client.GetAsync($"{ApiEndpoints.V1.Agents.GetAll}?{pagedRequest.ToQuery()}&IncludeDebts=true&DebtsFrom={dateFrom.ToString("ddMMyyyyHHmmss")}&DebtsTo={dateTo.ToString("ddMMyyyyHHmmss")}", token);
+            content = await response.Content.ReadAsStringAsync();
+
+            var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+            var result = await response.Content.ReadFromJsonAsync<AgentsResponse>(options);
+
+            if (response.IsSuccessStatusCode && result is not null)
+            {
+                totalDebt = result.TotalDebt;
+                totalCredit = result.TotalCredit;
+                stores = result.Stores;
+                agents = result.Agents;
+
+                return new TableData<AgentResponse>
+                    {
+                        TotalItems = result.Total,
+                        Items = result.Items
+                    };
+            }
+        }
+        catch (JsonException ex)
+        {
+            if (ex.Message.StartsWith("'<' is an invalid start of a value"))
+            {
+                Nav.NavigateTo("/", forceLoad: true);
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+
+            StateHasChanged();
+        }
+
+        return await Task.FromResult(new TableData<AgentResponse>
+            {
+                Items = new List<AgentResponse>()
+            });
+
+    }
+
+    public class FilterModel
+    {
+        public long? Id { get; set; }
+        public long? StoreId { get; set; }
+        public long? ManagerId { get; set; }
+
+        public bool IsEmpty => !StoreId.HasValue &&
+                   !Id.HasValue &&
+                   !ManagerId.HasValue;
+
+        public override string ToString()
+        {
+            List<string> result = new List<string>();
+
+            if (StoreId.HasValue)
+                result.Add($"(StoreId,{StoreId})");
+            if (Id.HasValue)
+                result.Add($"(Id,{Id})");
+            if (ManagerId.HasValue)
+                result.Add($"(ManagerId,{ManagerId})");
+
+            return string.Join("and", result);
+        }
+    }
+}

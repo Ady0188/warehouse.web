@@ -1,0 +1,80 @@
+﻿<PageTitle>@Title</PageTitle>
+
+<MudStack Spacing="2">
+    <MudStack Row=true>
+        <MudText Typo="Typo.h5" GutterBottom="true">@Title</MudText>
+        <MudSpacer />
+        <MudStack Row=true AlignItems="AlignItems.Center">
+            @if (ActionBar != null)
+            {
+                @ActionBar
+            }
+        </MudStack>
+    </MudStack>
+
+    @if (FilterBar != null)
+    {
+        <MudCollapse Expanded="FilterExpanded" Style="width:100%;">
+            <MudCard>
+                <MudStack Spacing="2" Style="margin:15px;">
+                    @FilterBar
+                    <MudDivider />
+                    <MudStack Row=true Justify="Justify.FlexEnd" Spacing="2">
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick=OnResetFilter>Сбросить</MudButton>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="() => FilterExpanded = false">Закрыть</MudButton>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color=Color.Info OnClick=OnApplyFilter>Применить</MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudCard>
+        </MudCollapse>
+    }
+
+    @if (IsLoading)
+    {
+        <MudProgressCircular Color="Color.Default" Indeterminate="true" />
+    }
+    else
+    {
+        @ChildContent
+    }
+</MudStack>
+
+<MudMessageBox @ref="_mudMessageBox" Title="Удаление" CancelText="Отменить">
+    <MessageContent>
+        Вы действительно хотите удалить данную запись?
+    </MessageContent>
+    <YesButton>
+        <MudButton Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteForever">Удалить</MudButton>
+    </YesButton>
+</MudMessageBox>
+
+@code {
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public RenderFragment? ActionBar { get; set; }
+
+    [Parameter]
+    public RenderFragment? FilterBar { get; set; }
+
+    [Parameter]
+    public EventCallback OnResetFilter { get; set; }
+
+    [Parameter]
+    public EventCallback OnApplyFilter { get; set; }
+
+    [Parameter]
+    public bool FilterExpanded { get; set; }
+
+    private MudMessageBox? _mudMessageBox;
+
+    public MudMessageBox? MessageBox => _mudMessageBox;
+
+}

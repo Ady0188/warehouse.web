@@ -1,0 +1,137 @@
+﻿@using System.Text.Json
+@using System.Text
+@inject HttpClient client
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid Style="padding: 0 0 10px 0;">
+            <MudItem xs="12">
+                <MudStack Row="true" AlignItems="AlignItems.End" Justify="Justify.FlexStart">
+
+                    <MonthPicker Month="_selectedMonth" PastYears="pastYears" PeriodChanged="OnPeriodChanged" />
+
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTable ServerData="ServerReload" Dense="true" Hover="true" Striped="true" @ref=table RowStyleFunc="new Func<AgentTurnoverResponse, int, string>(GetRowStyle)">
+                    <HeaderContent>
+                        <MudTh Style="width:90px;">№</MudTh>
+                        <MudTh>Тип документа</MudTh>
+                        <MudTh Style="width:150px;">Дата время</MudTh>
+                        <MudTh Style="width:150px;">Сумма</MudTh>
+                        <MudTh Style="width:150px;">Скидка</MudTh>
+                        <MudTh Style="width:150px;">Сумма после скидки</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Code.ToString().PadLeft(6, '0')</MudTd>
+                        <MudTd>@context.Operation</MudTd>
+                        <MudTd>@context.Date.ToString("dd.MM.yyyy HH:mm")</MudTd>
+                        <MudTd>@(Math.Abs(context.Amount))</MudTd>
+                        <MudTd>@(Math.Abs(context.Discount))</MudTd>
+                        <MudTd>@(Math.Abs(context.Amount - context.Discount))</MudTd>
+                    </RowTemplate>
+                    <FooterContent>
+                        <MudTh colspan="6"><MudStack Row><span><b>Остаток на начало @startTitle</b> @Math.Abs(startRemains)</span> <MudSpacer /> <span><b>Остаток на конец @endTitle</b> @Math.Abs(endRemains)</span></MudStack></MudTh>
+                    </FooterContent>
+                    <NoRecordsContent>
+                        <MudText>Нет данных, соответствующих фильтру</MudText>
+                    </NoRecordsContent>
+                    <LoadingContent>
+                        <MudText>Загрузка...</MudText>
+                    </LoadingContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} из {all_items}" RowsPerPageString="Строк на странице" />
+                    </PagerContent>
+                </MudTable>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Size="Size.Large" OnClick="Cancel">Закрыть</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public long AgentId { get; set; }
+
+    [Parameter]
+    public Period Period { get; set; }
+
+    List<AgentTurnoverResponse> turnovers = new();
+
+    MudTable<AgentTurnoverResponse> table;
+    decimal startRemains;
+    decimal endRemains;
+
+    string startTitle => startRemains < 0 ? " (долг):" : (startRemains == 0 ? ":" : " (предоплата):");
+    string endTitle => endRemains < 0 ? " (долг):" : (endRemains == 0 ? ":" : " (предоплата):");
+
+    private void Cancel() => MudDialog.Cancel();
+
+    DateTime fromDate = DateTime.Now;
+    DateTime toDate = DateTime.Now;
+    int page = 1;
+    int pageSize = 10;
+
+    int pastYears;
+    int _selectedMonth;
+
+    private async Task OnPeriodChanged(Period period)
+    {
+        fromDate = period.Start;
+        toDate = period.End;
+
+        await table.ReloadServerData();
+    }
+
+    private string GetRowStyle(AgentTurnoverResponse p, int row)
+    {
+        // if (p.Operation.Equals("Ревизия"))
+        //     return "background-color:#ffebee; color:#d32f2f;";
+        if (p.Operation.Equals("Ревизия"))
+            return "background-color:#e3f2fd; color:#2196f3;";
+
+        return "";
+    }
+
+    protected async Task Update()
+    {
+        await table.ReloadServerData();    
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        fromDate = Period.Start;
+        toDate = Period.End;
+        _selectedMonth = fromDate.Month;
+
+        pastYears = DateTime.Now.Year - 2025;
+    }
+
+    private async Task<TableData<AgentTurnoverResponse>> ServerReload(TableState state, CancellationToken token)
+    {
+        page = state.Page + 1;
+        pageSize = state.PageSize;
+
+        var remainsResponse = await client.GetAsync($"{ApiEndpoints.V1.Reports.AgentTurnovers}?page={page}&pageSize={pageSize}&agentId={AgentId}&fromDate={fromDate.ToString("ddMMyyyyHHmmss")}&toDate={toDate.ToString("ddMMyyyyHHmmss")}");
+
+        if (remainsResponse.IsSuccessStatusCode)
+        {
+            var remainsResult = await remainsResponse.Content.ReadFromJsonAsync<AgentTurnoversResponse>();
+
+            startRemains = remainsResult.StartRemains;
+            endRemains = remainsResult.EndRemains;
+
+            return new TableData<AgentTurnoverResponse>
+                {
+                    TotalItems = remainsResult!.Total,
+                    Items = remainsResult!.Items
+                };
+        }
+
+        return new TableData<AgentTurnoverResponse>();
+    }
+}
