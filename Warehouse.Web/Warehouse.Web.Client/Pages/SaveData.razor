@@ -3,6 +3,7 @@
 @using System.Text
 
 @inject HttpClient client
+@inject ILogger<SaveData> Logger
 
 <h3>GetData</h3>
 
@@ -163,6 +164,7 @@
             }
             catch (Exception ex)
             {
+                Logger.LogError(ex, "Failed to save agent debts.");
                 saveResult = "Error";
             }
 

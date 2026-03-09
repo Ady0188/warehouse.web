@@ -40,7 +40,7 @@ internal class NewHistoryCreatedIntegrationHandler : INotificationHandler<Histor
         }
         catch (Exception ex)
         {
-
+            _logger.LogError(ex, "Failed to handle history created event.");
             throw;
         }
     }

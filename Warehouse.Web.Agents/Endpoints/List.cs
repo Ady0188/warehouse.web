@@ -37,6 +37,7 @@ public class List : Endpoint<PagedRequest, AgentsResponse>
         if (queryResult is null || !queryResult.IsSuccess)
         {
             await SendErrorsAsync(500);
+            return;
         }
         else
         {

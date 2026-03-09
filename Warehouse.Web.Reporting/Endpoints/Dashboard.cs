@@ -1,6 +1,7 @@
 ﻿using FastEndpoints;
 using MediatR;
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 using Warehouse.Web.Reporting.Integrations;
 using Warehouse.Web.Shared;
 using Warehouse.Web.Shared.Responses;
@@ -11,11 +12,13 @@ internal class Dashboard : EndpointWithoutRequest<StoreMonthTradeTurnoversRespon
 {
     private readonly ProductTurnoverIngestionService _productTurnoverIngestionService;
     private readonly ICurrentUser _currentUser;
+    private readonly ILogger<Dashboard> _logger;
 
-    public Dashboard(ProductTurnoverIngestionService productTurnoverIngestionService, ICurrentUser currentUser)
+    public Dashboard(ProductTurnoverIngestionService productTurnoverIngestionService, ICurrentUser currentUser, ILogger<Dashboard> logger)
     {
         _productTurnoverIngestionService = productTurnoverIngestionService;
         _currentUser = currentUser;
+        _logger = logger;
     }
 
     public override void Configure()
@@ -63,6 +66,7 @@ internal class Dashboard : EndpointWithoutRequest<StoreMonthTradeTurnoversRespon
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to get dashboard report.");
             await SendErrorsAsync(500);
         }
     }

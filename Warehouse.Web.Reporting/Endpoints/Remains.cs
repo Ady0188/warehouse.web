@@ -1,6 +1,7 @@
 ﻿using FastEndpoints;
 using MediatR;
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 using Warehouse.Web.Reporting.Integrations;
 using Warehouse.Web.Shared;
 using Warehouse.Web.Shared.Responses;
@@ -11,12 +12,14 @@ internal class Remains : Endpoint<PagedRequest, RemainsesResponse>
     private readonly IMediator _mediator;
     private readonly ProductTurnoverIngestionService _productTurnoverIngestionService;
     private readonly ICurrentUser _currentUser;
+    private readonly ILogger<Remains> _logger;
 
-    public Remains(IMediator mediator, ProductTurnoverIngestionService productTurnoverIngestionService, ICurrentUser currentUser)
+    public Remains(IMediator mediator, ProductTurnoverIngestionService productTurnoverIngestionService, ICurrentUser currentUser, ILogger<Remains> logger)
     {
         _mediator = mediator;
         _productTurnoverIngestionService = productTurnoverIngestionService;
         _currentUser = currentUser;
+        _logger = logger;
     }
 
     public override void Configure()
@@ -31,7 +34,15 @@ internal class Remains : Endpoint<PagedRequest, RemainsesResponse>
         {
             var date = DateTime.Now;
             if (!string.IsNullOrEmpty(request.DateTime))
-                date = DateTime.ParseExact(request.DateTime, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture).AddMilliseconds(-50);
+            {
+                if (!DateTime.TryParseExact(request.DateTime, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+                {
+                    AddError("Invalid date format. Expected ddMMyyyyHHmmss.");
+                    await SendErrorsAsync(400, ct);
+                    return;
+                }
+                date = parsed.AddMilliseconds(-50);
+            }
 
             List<ProductTurnover> turnovers = new();
             if (_currentUser.StoreId == 0)
@@ -71,6 +82,7 @@ internal class Remains : Endpoint<PagedRequest, RemainsesResponse>
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to get remains report.");
             await SendErrorsAsync(500);
         }
     }

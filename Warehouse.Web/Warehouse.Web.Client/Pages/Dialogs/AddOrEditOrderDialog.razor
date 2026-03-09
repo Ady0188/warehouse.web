@@ -7,7 +7,7 @@
         <MudForm @ref="form">
             <MudGrid Style="padding: 0 0 10px 0;">
                 <MudItem xs="4">
-                    <MudDateTimePicker Label="От" @bind-Value=@date MinDate=@(new DateTime(2025, 10, 1)) MaxDate=@(DateTime.Now) />
+                    <MudDateTimePicker Label="От" @bind-Value=@date MinDate=@(new DateTime(2026, 02, 02)) MaxDate=@(DateTime.Now) />
                 </MudItem>
                 <MudItem xs="8">
                     <MudSelect T="long?" @bind-Value="storeId" Label="Склад" Required="true" Dense Clearable>

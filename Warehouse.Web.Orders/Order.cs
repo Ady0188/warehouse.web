@@ -1,6 +1,7 @@
 ﻿using Ardalis.GuardClauses;
 using System.ComponentModel.DataAnnotations.Schema;
 using Warehouse.Web.Contracts;
+using static Warehouse.Web.Shared.ApiEndpoints.V1;
 
 namespace Warehouse.Web.Orders
 {
@@ -118,7 +119,7 @@ namespace Warehouse.Web.Orders
 
             order.RegisterDomainEvent(new OrderHistoryEvent(order, null, HistoryMethod.Create, userName, userStoreName, storeName, agentName));
 
-            order.RegisterDomainEvent(new AgentRemainsEvent(order, userStoreName!, agentName, managerId, managerName));
+            order.RegisterDomainEvent(new AgentRemainsEvent(order, userStoreName!, agentName, managerId, managerName, HistoryMethod.Create));
 
             return order;
         }
@@ -142,7 +143,7 @@ namespace Warehouse.Web.Orders
 
             RegisterDomainEvent(new OrderHistoryEvent(this, oldOrder, HistoryMethod.Update, userName, userStoreName, storeName, $"{oldAgentName}|{agentName}"));
             
-            RegisterDomainEvent(new AgentRemainsEvent(this, userStoreName!, agentName, managerId, managerName));
+            RegisterDomainEvent(new AgentRemainsEvent(this, userStoreName!, agentName, managerId, managerName, HistoryMethod.Update));
         }
 
         //internal void Update(string? userName, string? userStoreName, long storeId, long agentId, OrderType type, decimal amount, DateTime date, long? docId, decimal? auditCurrentAmount, decimal? auditFactAmount, string? comment, string storeName)
@@ -158,6 +159,8 @@ namespace Warehouse.Web.Orders
         internal void Delete(string? userName, string? userStoreName)
         {
             RegisterDomainEvent(new OrderHistoryEvent(this, null, HistoryMethod.Delete, userName, userStoreName, null, null));
+
+            RegisterDomainEvent(new AgentRemainsEvent(this, userStoreName!, null, 0, null, HistoryMethod.Delete));
         }
 
 

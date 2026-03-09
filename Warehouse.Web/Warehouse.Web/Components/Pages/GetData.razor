@@ -11,6 +11,7 @@
 
 @inject HttpClient client
 @inject HttpClient client1
+@inject ILogger<GetData> Logger
 
 <h3>GetData</h3>
 
@@ -73,7 +74,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"ERROR: {ex}");
+            Logger.LogError(ex, "Failed to fetch data from {Url}.", url);
         }
     }
 

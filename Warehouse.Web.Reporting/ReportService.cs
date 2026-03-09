@@ -2,6 +2,7 @@
 using System.Text.RegularExpressions;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
+using Microsoft.Extensions.Logging;
 
 namespace Warehouse.Web.Reporting;
 
@@ -17,10 +18,12 @@ internal interface IReportService
 internal class ReportService : IReportService
 {
     private readonly string _templatesPath;
+    private readonly ILogger<ReportService> _logger;
     private readonly List<string> Columns = new List<string> { "", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z" };
 
-    public ReportService()
+    public ReportService(ILogger<ReportService> logger)
     {
+        _logger = logger;
         _templatesPath = Path.Combine(Directory.GetCurrentDirectory(), "Templates");
 
         var count = Columns.Count - 1;
@@ -310,7 +313,7 @@ internal class ReportService : IReportService
         }
         catch (Exception ex)
         {
-
+            _logger.LogError(ex, "Failed to print report (template={Template}).", templateName);
             throw;
         }
     }

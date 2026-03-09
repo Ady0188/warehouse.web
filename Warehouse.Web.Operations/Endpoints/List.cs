@@ -35,6 +35,7 @@ public class List : Endpoint<PagedRequest, OperationsResponse>
         if (queryResult is null || !queryResult.IsSuccess)
         {
             await SendErrorsAsync(500);
+            return;
         }
         else
         {

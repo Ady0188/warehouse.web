@@ -14,4 +14,5 @@ public class AgentRemainsDto
     public decimal Amount { get; set; }
     public decimal Disctount { get; set; }
     public DateTime Date { get; set; }
+    public HistoryMethod Method { get; set; }
 }

@@ -1,6 +1,7 @@
 ﻿using FastEndpoints;
 using MediatR;
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 using Warehouse.Web.Reporting.Integrations;
 using Warehouse.Web.Shared;
 using Warehouse.Web.Shared.Responses;
@@ -11,12 +12,14 @@ internal class Debts : Endpoint<PagedRequest, AgentsResponse>
     private readonly IMediator _mediator;
     private readonly AgentRemainsIngestionService _agentRemainsIngestionService;
     private readonly ICurrentUser _currentUser;
+    private readonly ILogger<Debts> _logger;
 
-    public Debts(IMediator mediator, ICurrentUser currentUser, AgentRemainsIngestionService agentRemainsIngestionService)
+    public Debts(IMediator mediator, ICurrentUser currentUser, AgentRemainsIngestionService agentRemainsIngestionService, ILogger<Debts> logger)
     {
         _mediator = mediator;
         _currentUser = currentUser;
         _agentRemainsIngestionService = agentRemainsIngestionService;
+        _logger = logger;
     }
 
     public override void Configure()
@@ -31,7 +34,15 @@ internal class Debts : Endpoint<PagedRequest, AgentsResponse>
         {
             var date = DateTime.Now;
             if (!string.IsNullOrEmpty(request.DateTime))
-                date = DateTime.ParseExact(request.DateTime, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture).AddMilliseconds(-50);
+            {
+                if (!DateTime.TryParseExact(request.DateTime, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+                {
+                    AddError("Invalid date format. Expected ddMMyyyyHHmmss.");
+                    await SendErrorsAsync(400, ct);
+                    return;
+                }
+                date = parsed.AddMilliseconds(-50);
+            }
 
             var all = await _agentRemainsIngestionService.GetAllDebtsAsync();
 
@@ -88,6 +99,7 @@ internal class Debts : Endpoint<PagedRequest, AgentsResponse>
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to get debts report.");
             await SendErrorsAsync(500);
         }
     }

@@ -31,9 +31,9 @@ internal class AgentRemainsIngestionService
                     store_id     bigint,
                     store_name   varchar(50),
                     manager_id   bigint,
-                    manager_name varchar(50),
+                    manager_name varchar(200),
                     agent_id     bigint,
-                    agent_name   varchar(50),
+                    agent_name   varchar(200),
                     object_id    bigint,
                     object_code  integer,
                     object_name  varchar(50),
@@ -54,6 +54,7 @@ internal class AgentRemainsIngestionService
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to create reporting agent_remains table.");
             throw;
         }
         finally

@@ -133,13 +133,13 @@ namespace Warehouse.Web.Operations
                 },
                 [nameof(Operation.Amount)] = v =>
                 {
-                    var val = decimal.Parse(v.Replace(",", "."), new NumberFormatInfo() { NumberDecimalSeparator = "." });
-                    query = query.Where(x => x.Amount == val);
+                    if (decimal.TryParse(v.Replace(",", "."), NumberStyles.Number, new NumberFormatInfo { NumberDecimalSeparator = "." }, out var val))
+                        query = query.Where(x => x.Amount == val);
                 },
                 [nameof(Operation.Discount)] = v =>
                 {
-                    var val = decimal.Parse(v.Replace(",", "."), new NumberFormatInfo() { NumberDecimalSeparator = "." });
-                    query = query.Where(x => x.Discount == val);
+                    if (decimal.TryParse(v.Replace(",", "."), NumberStyles.Number, new NumberFormatInfo { NumberDecimalSeparator = "." }, out var val))
+                        query = query.Where(x => x.Discount == val);
                 },
                 [nameof(Operation.Comment)] = v =>
                 {

@@ -119,8 +119,8 @@ namespace Warehouse.Web.Orders
                 },
                 [nameof(Order.Amount)] = v =>
                 {
-                    var val = decimal.Parse(v.Replace(",", "."), new NumberFormatInfo() { NumberDecimalSeparator = "." });
-                    query = query.Where(x => x.Amount == val);
+                    if (decimal.TryParse(v.Replace(",", "."), NumberStyles.Number, new NumberFormatInfo { NumberDecimalSeparator = "." }, out var val))
+                        query = query.Where(x => x.Amount == val);
                 },
                 [nameof(Order.Comment)] = v =>
                 {

@@ -23,7 +23,12 @@ public class Create : Endpoint<CreateOperationRequest>
 
     public override async Task HandleAsync(CreateOperationRequest req, CancellationToken ct)
     {
-        var dt = DateTime.ParseExact(req.Date, "ddMMyyyyHHmm", CultureInfo.InvariantCulture);
+        if (!DateTime.TryParseExact(req.Date, "ddMMyyyyHHmm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+        {
+            AddError("Invalid date format. Expected ddMMyyyyHHmm.");
+            await SendErrorsAsync(400, ct);
+            return;
+        }
 
         var command = new CreateOperationCommand(dt, req.Amount, req.Discount, req.Type, req.StoreId, req.ReceiverId, req.Comment, req.Products);
         var commandResult = await _mediator.Send(command);

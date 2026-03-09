@@ -57,6 +57,7 @@ internal class HistoryIngestionService
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to create reporting history table.");
             throw;
         }
         finally

@@ -35,11 +35,15 @@ internal class GetAllOperationsQueryHandler : IRequestHandler<GetAllOperationsQu
         long managerId = 0;
         if (request.Options.Filter is not null && request.Options.Filter.Contains("ManagerId"))
         {
-            var splited = request.Options.Filter.Split(")and(").First(x => x.Contains("ManagerId")).Trim('(', ')').Split(',')!;
-            var idStr = Uri.UnescapeDataString(splited[1]?.Trim() ?? string.Empty);
+            var managerFilter = request.Options.Filter.Split(")and(").FirstOrDefault(x => x.Contains("ManagerId"));
+            if (!string.IsNullOrEmpty(managerFilter))
+            {
+                var splited = managerFilter.Trim('(', ')').Split(',');
+                var idStr = splited.Length > 1 ? Uri.UnescapeDataString(splited[1]?.Trim() ?? string.Empty) : string.Empty;
 
-            if (!string.IsNullOrEmpty(idStr))
-                managerId = long.Parse(idStr);
+                if (long.TryParse(idStr, out var parsedId))
+                    managerId = parsedId;
+            }
         }
 
         Dictionary<long, StoreResponse>  stores = storesQueryResult.Value

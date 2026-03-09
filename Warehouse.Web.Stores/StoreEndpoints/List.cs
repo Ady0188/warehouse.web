@@ -15,25 +15,18 @@ internal class List(IStoreService storeService) : Endpoint<PagedRequest, StoresR
 
     public override async Task HandleAsync(PagedRequest request, CancellationToken ct)
     {
-        try
-        {
-            var user = User;
-            var list = await _storeService.ListStoresAsync(request.ToOptions());
-            var stores = list.Result;
+        var user = User;
+        var list = await _storeService.ListStoresAsync(request.ToOptions());
+        var stores = list.Result;
 
-            await SendAsync(new StoresResponse
-            {
-                Total = list.Total,
-                Items = stores.Select(x => new StoreResponse
-                {
-                    Id = x.Id,
-                    Name = x.Name
-                }).ToList()
-            });
-        }
-        catch (Exception ex)
+        await SendAsync(new StoresResponse
         {
-            throw;
-        }
+            Total = list.Total,
+            Items = stores.Select(x => new StoreResponse
+            {
+                Id = x.Id,
+                Name = x.Name
+            }).ToList()
+        });
     }
 }

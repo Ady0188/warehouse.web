@@ -1,6 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System.Reflection;
+using System.Text.Json;
 
 namespace Warehouse.Web.Operations.Data;
 
@@ -11,7 +12,9 @@ internal class OperationDbContext : DbContext
     {
         _dispatcher = dispatcher;
     }
+
     public DbSet<Outbox> Outboxes { get; set; } = null!;
+    public DbSet<ReportOutbox> ReportOutboxes { get; set; } = null!;
     public DbSet<Operation> Operations { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -36,44 +39,60 @@ internal class OperationDbContext : DbContext
             .SelectMany(e => e.DomainEvents)
             .ToList();
 
-        await using var tx = await Database.BeginTransactionAsync(cancellationToken);
+        var startedNewTransaction = Database.CurrentTransaction is null;
+        var tx = Database.CurrentTransaction ?? await Database.BeginTransactionAsync(cancellationToken);
 
-        var result = await base.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-        foreach (var ev in pendingEvents)
-        {
-            if (ev is OperationHistoryEvent he)
-            {
-                var oldJson = he.OldOperation?.ToJson();
-                var newJson = he.NewOperation.ToJson();
-
-                Outboxes.Add(Outbox.FromEvent(
-                    storeName: he.StoreName ?? "unknown",
-                    userName: he.UserName ?? "unknown",
-                    method: (short)he.Method,
-                    objectId: he.NewOperation.Id,
-                    objectName: "Operation",
-                    oldData: oldJson,
-                    newData: newJson
-                ));
-            }
-        }
-
-        _flushingOutbox = true;
         try
         {
-            await base.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            var result = await base.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+            foreach (var ev in pendingEvents)
+            {
+                if (ev is OperationHistoryEvent he)
+                {
+                    var oldJson = he.OldOperation?.ToJson();
+                    var newJson = he.NewOperation.ToJson();
+
+                    Outboxes.Add(Outbox.FromEvent(
+                        storeName: he.StoreName ?? "unknown",
+                        userName: he.UserName ?? "unknown",
+                        method: (short)he.Method,
+                        objectId: he.NewOperation.Id,
+                        objectName: "Operation",
+                        oldData: oldJson,
+                        newData: newJson
+                    ));
+                }
+                else if (ev is OperationReportEvent re)
+                {
+                    var payload = OperationReportOutboxPayload.FromEvent(re);
+                    var json = JsonSerializer.Serialize(payload);
+                    ReportOutboxes.Add(ReportOutbox.FromPayload(json));
+                }
+            }
+
+            _flushingOutbox = true;
+            try
+            {
+                await base.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _flushingOutbox = false;
+            }
+
+            if (startedNewTransaction)
+                await tx.CommitAsync(cancellationToken);
+
+            if (_dispatcher != null && entitiesWithEvents.Length > 0)
+                await _dispatcher.DispatchAndClearEvents(entitiesWithEvents).ConfigureAwait(false);
+
+            return result;
         }
         finally
         {
-            _flushingOutbox = false;
+            if (startedNewTransaction)
+                await tx.DisposeAsync();
         }
-
-        await tx.CommitAsync(cancellationToken);
-
-        if (_dispatcher != null && entitiesWithEvents.Length > 0)
-            await _dispatcher.DispatchAndClearEvents(entitiesWithEvents).ConfigureAwait(false);
-
-        return result;
     }
 }

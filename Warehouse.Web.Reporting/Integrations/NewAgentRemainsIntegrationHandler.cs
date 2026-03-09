@@ -23,25 +23,29 @@ internal class NewAgentRemainsIntegrationHandler : INotificationHandler<AgentRem
 
             var remains = notification.Remains;
 
-            await _agentRemainsIngestionService.AddReportAsync(new AgentRemains
-            {
-                StoreId = remains.StoreId,
-                StoreName = remains.StoreName,
-                ManagerId = remains.ManagerId,
-                ManagerName = remains.ManagerName,
-                AgentId = remains.AgentId,
-                AgentName = remains.AgentName,
-                ObjectId = remains.ObjectId,
-                ObjectCode = remains.ObjectCode,
-                ObjectName = remains.ObjectName,
-                ObjectType = remains.ObjectType,
-                Amount = remains.Amount,
-                Discount = remains.Disctount,
-                Date = remains.Date
-            });
+            if (remains != null && remains.Method == HistoryMethod.Delete)
+                await _agentRemainsIngestionService.DeleteReportAsync(remains.ObjectId, remains.ObjectType);
+            else
+                await _agentRemainsIngestionService.AddReportAsync(new AgentRemains
+                {
+                    StoreId = remains.StoreId,
+                    StoreName = remains.StoreName,
+                    ManagerId = remains.ManagerId,
+                    ManagerName = remains.ManagerName,
+                    AgentId = remains.AgentId,
+                    AgentName = remains.AgentName,
+                    ObjectId = remains.ObjectId,
+                    ObjectCode = remains.ObjectCode,
+                    ObjectName = remains.ObjectName,
+                    ObjectType = remains.ObjectType,
+                    Amount = remains.Amount,
+                    Discount = remains.Disctount,
+                    Date = remains.Date
+                });
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to handle agent remains integration event.");
             throw;
         }
     }

@@ -36,12 +36,12 @@ internal class ProductTurnoverIngestionService
                     -- to_store_id      bigint,
                     -- to_store_name    varchar(50),
                     manager_id    bigint,
-                    manager_name  varchar(50),
+                    manager_name  varchar(200),
                     manager_phone  varchar(15),
                     agent_id      bigint,
-                    agent_name    varchar(50),
-                    agent_phone    varchar(50),
-                    agent_address    varchar(50),
+                    agent_name    varchar(200),
+                    agent_phone    varchar(15),
+                    agent_address    varchar(200),
                     object_id     bigint           NOT NULL,
                     object_parent_id     bigint           NOT NULL,
                     object_code   integer,
@@ -84,6 +84,7 @@ internal class ProductTurnoverIngestionService
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to create reporting tables.");
             throw;
         }
         finally
@@ -216,6 +217,7 @@ internal class ProductTurnoverIngestionService
         {
             // В случае исключения откатываем
             try { await tx.RollbackAsync(); } catch { /* игнорируем ошибки при rollback */ }
+            _logger.LogError("Failed to add product turnover.");
             throw;
         }
         finally
@@ -354,6 +356,7 @@ internal class ProductTurnoverIngestionService
         catch
         {
             try { await tx.RollbackAsync(); } catch { }
+            _logger.LogError("Failed to update product turnover.");
             throw;
         }
         finally
@@ -410,6 +413,7 @@ internal class ProductTurnoverIngestionService
         catch
         {
             try { await tx.RollbackAsync(); } catch { }
+            _logger.LogError("Failed to delete product turnover.");
             throw;
         }
         finally

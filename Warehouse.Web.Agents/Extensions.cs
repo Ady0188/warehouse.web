@@ -11,8 +11,19 @@ internal static class Extensions
 
     public static GetAllOptions ToOptions(this PagedRequest request, int pageSize = 0)
     {
-        var dateTo = string.IsNullOrEmpty(request.DebtsTo) ? DateTime.Now : DateTime.ParseExact(request.DebtsTo, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture);
-        var dateFrom = string.IsNullOrEmpty(request.DebtsFrom) ? new DateTime(dateTo.Year, dateTo.Month, 1, 0, 0, 0) : DateTime.ParseExact(request.DebtsFrom, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture);
+        var dateTo = DateTime.Now;
+        if (!string.IsNullOrEmpty(request.DebtsTo) &&
+            DateTime.TryParseExact(request.DebtsTo, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedTo))
+        {
+            dateTo = parsedTo;
+        }
+
+        var dateFrom = new DateTime(dateTo.Year, dateTo.Month, 1, 0, 0, 0);
+        if (!string.IsNullOrEmpty(request.DebtsFrom) &&
+            DateTime.TryParseExact(request.DebtsFrom, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedFrom))
+        {
+            dateFrom = parsedFrom;
+        }
 
         return new GetAllOptions
         {

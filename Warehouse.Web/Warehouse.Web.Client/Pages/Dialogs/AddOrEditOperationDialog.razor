@@ -11,7 +11,7 @@
                     <MudStack Row="true" AlignItems="AlignItems.End" Justify="Justify.FlexStart">
                         <MudText Inline>@Title</MudText>
                         <MudStack Style="width:175px;">
-                            <MudDateTimePicker Label="От" @bind-Value=@date MinDate=@(new DateTime(2025, 10, 1)) MaxDate=@(DateTime.Now) />
+                            <MudDateTimePicker Label="От" @bind-Value=@date MinDate=@(new DateTime(2026, 02, 02)) MaxDate=@(DateTime.Now) />
                         </MudStack>
                         <MudSelect T="long?" @bind-Value="storeId" Label="Склад" Required="true" Clearable Style="width:130px;" Disabled=@(OperationType == OperationType.Receive)>
                             @foreach (var store in _stores)
@@ -32,7 +32,7 @@
                         else
                         {
                             <MyMudSelect TItem="long" @bind-Value="agentId" Label="Контрагент" Items=@_agents.ToDictionary(x => x.Id, x => x.Name) Searchable />
-                            
+
                             @* <MudSelect T="long?" @bind-Value="agentId" Label="Контрагент" Required="true" Clearable Style="width:300px;">
                                 @foreach (var agent in _agents)
                                 {
@@ -53,11 +53,11 @@
                             <MudTh Style="width:100px;text-align:center;">
                                 @if (OperationType == OperationType.Send || OperationType == OperationType.Receive)
                                 {
-                                    <ActionButton Icon="@Icons.Material.Filled.Add" Color="Color.Secondary" Tooltip="Добавить" OnClick=@OnChoose Disabled=@(!storeId.HasValue || !toStoreId.HasValue || OperationType == OperationType.Receive) />
+                                    <ActionButton @ref=sendOrReceiveBtn Icon="@Icons.Material.Filled.Add" Color="Color.Secondary" Tooltip="Добавить" OnClick=@OnChoose Disabled=@(!storeId.HasValue || !toStoreId.HasValue || OperationType == OperationType.Receive) />
                                 }
                                 else
                                 {
-                                    <ActionButton Icon="@Icons.Material.Filled.Add" Color="Color.Secondary" Tooltip="Добавить" OnClick=@OnChoose Disabled=@(!storeId.HasValue || !agentId.HasValue) />
+                                    <ActionButton @ref=chooseBtn Icon="@Icons.Material.Filled.Add" Color="Color.Secondary" Tooltip="Добавить" OnClick=@OnChoose Disabled=@(!storeId.HasValue || !agentId.HasValue) />
                                 }
                             </MudTh>
                         </HeaderContent>
@@ -170,6 +170,9 @@
 
     private MudForm form;
 
+    private ActionButton sendOrReceiveBtn;
+    private ActionButton chooseBtn;
+
     DateTime date = DateTime.Now;
     decimal discountPercentage;
     decimal amount => productsRequest.Sum(x => x.Quantity * x.Price);
@@ -268,8 +271,14 @@
 
             StateHasChanged();
 
-            await Task.Delay(500);
+            await Task.Delay(100);
+            
             OnChoose();
+
+            // if (OperationType == OperationType.Send || OperationType == OperationType.Receive)
+            //     await sendOrReceiveBtn.FocusAsync();
+            // else
+            //     await chooseBtn.FocusAsync();
         }
     }
 
@@ -379,7 +388,7 @@
                     Quantity = x.Quantity,
                     SellPrice = x.SellPrice,
                     Unit = x.Unit
-                }).ToList();
+                }).OrderBy(x => x.Name).ToList();
         }
         else
         {

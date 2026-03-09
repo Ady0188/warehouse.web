@@ -23,21 +23,15 @@ public class List : Endpoint<PagedRequest, UsersResponse>
 
     public override async Task HandleAsync(PagedRequest request, CancellationToken ct)
     {
-        try
-        {
-            var query = new GetAllUsersQuery(request.ToOptions());
-            var result = await _mediator.Send(query);
+        var query = new GetAllUsersQuery(request.ToOptions());
+        var result = await _mediator.Send(query);
 
-            if (!result.IsSuccess)
-            {
-                await SendErrorsAsync(500, ct);
-            }
-
-            await SendAsync(result.Value);
-        }
-        catch (Exception ex)
+        if (!result.IsSuccess)
         {
-            throw;
+            await SendErrorsAsync(500, ct);
+            return;
         }
+
+        await SendAsync(result.Value);
     }
 }

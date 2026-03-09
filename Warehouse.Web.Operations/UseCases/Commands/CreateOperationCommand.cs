@@ -1,5 +1,6 @@
 ﻿using Ardalis.Result;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Warehouse.Web.Agents.Contracts;
 using Warehouse.Web.Operations.Endpoints;
 using Warehouse.Web.Shared.Responses;
@@ -13,12 +14,14 @@ internal class CreateOperationCommandHandler : IRequestHandler<CreateOperationCo
     private readonly IOperationRepository _operationRepository;
     private readonly IMediator _mediator;
     private readonly ICurrentUser _currentUser;
+    private readonly ILogger<CreateOperationCommandHandler> _logger;
 
-    public CreateOperationCommandHandler(IOperationRepository operationRepository, IMediator mediator, ICurrentUser currentUser)
+    public CreateOperationCommandHandler(IOperationRepository operationRepository, IMediator mediator, ICurrentUser currentUser, ILogger<CreateOperationCommandHandler> logger)
     {
         _operationRepository = operationRepository;
         _mediator = mediator;
         _currentUser = currentUser;
+        _logger = logger;
     }
     public async Task<Result> Handle(CreateOperationCommand request, CancellationToken cancellationToken)
     {
@@ -41,7 +44,7 @@ internal class CreateOperationCommandHandler : IRequestHandler<CreateOperationCo
                 var toStoreQuery = new GetStoreByIdQuery(request.ReceiverId);
                 var toStoreResult = await _mediator.Send(toStoreQuery);
 
-                if (request.ReceiverId != 0 && storeResult.Status == ResultStatus.NotFound)
+                if (request.ReceiverId != 0 && toStoreResult.Status == ResultStatus.NotFound)
                     return Result.NotFound($"ToStore with id '{request.ReceiverId}' not found");
 
                 _toStore = toStoreResult.Value;
@@ -90,6 +93,7 @@ internal class CreateOperationCommandHandler : IRequestHandler<CreateOperationCo
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to create operation (StoreId={StoreId}, ReceiverId={ReceiverId}).", request.StoreId, request.ReceiverId);
             return Result.Error(ex.Message);
         }
     }

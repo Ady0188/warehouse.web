@@ -29,15 +29,22 @@ namespace Warehouse.Web.Orders.UseCases.Queries
             var storesQuery = new GetAllStoresQuery(true);
             var storesQueryResult = await _mediator.Send(storesQuery);
 
+            if (!storesQueryResult.IsSuccess)
+                return Result.Error(storesQueryResult.Errors.First());
+
             var managers = storesQueryResult.Value.SelectMany(x => x.Managers);
             long managerId = 0;
             if (request.Options.Filter is not null && request.Options.Filter.Contains("ManagerId"))
             {
-                var splited = request.Options.Filter.Split(")and(").First(x => x.Contains("ManagerId")).Trim('(', ')').Split(',')!;
-                var idStr = Uri.UnescapeDataString(splited[1]?.Trim() ?? string.Empty);
+                var managerFilter = request.Options.Filter.Split(")and(").FirstOrDefault(x => x.Contains("ManagerId"));
+                if (!string.IsNullOrEmpty(managerFilter))
+                {
+                    var splited = managerFilter.Trim('(', ')').Split(',');
+                    var idStr = splited.Length > 1 ? Uri.UnescapeDataString(splited[1]?.Trim() ?? string.Empty) : string.Empty;
 
-                if (!string.IsNullOrEmpty(idStr))
-                    managerId = long.Parse(idStr);
+                    if (long.TryParse(idStr, out var parsedId))
+                        managerId = parsedId;
+                }
             }
 
             Dictionary<long, StoreResponse> stores = storesQueryResult.Value
@@ -131,8 +138,11 @@ namespace Warehouse.Web.Orders.UseCases.Queries
 
             if (request.IncludeDebts)
             {
-                var dateFrom = DateTime.ParseExact(request.DateFrom!, "ddMMyyyy", CultureInfo.InvariantCulture);
-                var dateTo = DateTime.ParseExact(request.DateTo!, "ddMMyyyy", CultureInfo.InvariantCulture);
+                if (!DateTime.TryParseExact(request.DateFrom, "ddMMyyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateFrom) ||
+                    !DateTime.TryParseExact(request.DateTo, "ddMMyyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateTo))
+                {
+                    return Result.Error("Invalid date range format. Expected ddMMyyyy.");
+                }
 
                 var debtsQuery = new GetAgentsDebtsQuery(dateFrom, dateTo);
                 var debtsQueryResult = await _mediator.Send(debtsQuery);

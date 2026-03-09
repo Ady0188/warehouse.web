@@ -1,6 +1,7 @@
 ﻿using FastEndpoints;
 using MediatR;
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 using Warehouse.Web.Reporting.Integrations;
 using Warehouse.Web.Shared;
 using Warehouse.Web.Shared.Responses;
@@ -11,11 +12,13 @@ internal class AgentTurnovers : Endpoint<TurnoverPagedRequest, AgentTurnoversRes
 {
     private readonly IMediator _mediator;
     private readonly AgentRemainsIngestionService _agentRemainsIngestionService;
+    private readonly ILogger<AgentTurnovers> _logger;
 
-    public AgentTurnovers(IMediator mediator, AgentRemainsIngestionService agentRemainsIngestionService)
+    public AgentTurnovers(IMediator mediator, AgentRemainsIngestionService agentRemainsIngestionService, ILogger<AgentTurnovers> logger)
     {
         _mediator = mediator;
         _agentRemainsIngestionService = agentRemainsIngestionService;
+        _logger = logger;
     }
 
     public override void Configure()
@@ -31,9 +34,25 @@ internal class AgentTurnovers : Endpoint<TurnoverPagedRequest, AgentTurnoversRes
             var toDate = DateTime.Now;
             var fromDate = new DateTime(toDate.Year, toDate.Month, toDate.Day, 0, 0, 0);
             if (!string.IsNullOrEmpty(request.FromDate))
-                fromDate = DateTime.ParseExact(request.FromDate, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture);
+            {
+                if (!DateTime.TryParseExact(request.FromDate, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedFrom))
+                {
+                    AddError("Invalid from date format. Expected ddMMyyyyHHmmss.");
+                    await SendErrorsAsync(400, ct);
+                    return;
+                }
+                fromDate = parsedFrom;
+            }
             if (!string.IsNullOrEmpty(request.ToDate))
-                toDate = DateTime.ParseExact(request.ToDate, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture);
+            {
+                if (!DateTime.TryParseExact(request.ToDate, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedTo))
+                {
+                    AddError("Invalid to date format. Expected ddMMyyyyHHmmss.");
+                    await SendErrorsAsync(400, ct);
+                    return;
+                }
+                toDate = parsedTo;
+            }
 
             if (request.AgentId.HasValue)
             {
@@ -70,6 +89,7 @@ internal class AgentTurnovers : Endpoint<TurnoverPagedRequest, AgentTurnoversRes
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to get agent turnovers.");
             await SendErrorsAsync(500);
         }
     }
@@ -78,11 +98,13 @@ internal class ProductTurnovers : Endpoint<TurnoverPagedRequest, TurnoversRespon
 {
     private readonly IMediator _mediator;
     private readonly ProductTurnoverIngestionService _productTurnoverIngestionService;
+    private readonly ILogger<ProductTurnovers> _logger;
 
-    public ProductTurnovers(IMediator mediator, ProductTurnoverIngestionService productTurnoverIngestionService)
+    public ProductTurnovers(IMediator mediator, ProductTurnoverIngestionService productTurnoverIngestionService, ILogger<ProductTurnovers> logger)
     {
         _mediator = mediator;
         _productTurnoverIngestionService = productTurnoverIngestionService;
+        _logger = logger;
     }
 
     public override void Configure()
@@ -98,9 +120,25 @@ internal class ProductTurnovers : Endpoint<TurnoverPagedRequest, TurnoversRespon
             var toDate = DateTime.Now;
             var fromDate = new DateTime(toDate.Year, toDate.Month, toDate.Day, 0, 0, 0);
             if (!string.IsNullOrEmpty(request.FromDate))
-                fromDate = DateTime.ParseExact(request.FromDate, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture);
+            {
+                if (!DateTime.TryParseExact(request.FromDate, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedFrom))
+                {
+                    AddError("Invalid from date format. Expected ddMMyyyyHHmmss.");
+                    await SendErrorsAsync(400, ct);
+                    return;
+                }
+                fromDate = parsedFrom;
+            }
             if (!string.IsNullOrEmpty(request.ToDate))
-                toDate = DateTime.ParseExact(request.ToDate, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture);
+            {
+                if (!DateTime.TryParseExact(request.ToDate, "ddMMyyyyHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedTo))
+                {
+                    AddError("Invalid to date format. Expected ddMMyyyyHHmmss.");
+                    await SendErrorsAsync(400, ct);
+                    return;
+                }
+                toDate = parsedTo;
+            }
 
             long storeId = request.StoreId ?? 0;
 
@@ -141,6 +179,7 @@ internal class ProductTurnovers : Endpoint<TurnoverPagedRequest, TurnoversRespon
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to get product turnovers.");
             await SendErrorsAsync(500);
         }
     }

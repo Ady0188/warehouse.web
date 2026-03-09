@@ -1,5 +1,6 @@
 ﻿<MudTooltip Text=@Tooltip Color=@Color>
-    <MyIconButton Icon=@Icon
+    <MyIconButton @ref="_btn"
+        Icon=@Icon
     Variant="Variant.Outlined"
     ExtendedSize=@Size
     Color=@Color
@@ -8,6 +9,11 @@
 </MudTooltip>
 
 @code {
+    private MyIconButton? _btn;
+
+    public ValueTask FocusAsync()
+        => _btn is null ? ValueTask.CompletedTask : _btn.FocusAsync();
+
     [Parameter]
     public EventCallback OnClick { get; set; }
 

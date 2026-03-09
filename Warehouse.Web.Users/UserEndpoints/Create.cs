@@ -48,46 +48,38 @@ public class Create : Endpoint<CreateUserRequest, UserResponse>
 
     private async Task<(IEnumerable<IdentityError> Errors, string UserId)> RegisterUser(CreateUserRequest request)
     {
-        try
+        string _userEmail = request.Login.Contains("@") ? request.Login : $"{request.Login}@store.tj";
+
+        var user = CreateUser();
+        user.Firstname = request.Firstname;
+        user.Lastname = request.Lastname;
+        user.Address = request.Address;
+        user.StoreId = request.StoreId;
+        user.StoreName = request.StoreName;
+        user.PhoneNumber = request.Phone;
+
+        await _userStore.SetUserNameAsync(user, request.Login, CancellationToken.None);
+        var emailStore = GetEmailStore();
+        await emailStore.SetEmailAsync(user, _userEmail, CancellationToken.None);
+        //await emailStore.SetEmailConfirmedAsync(user, true, CancellationToken.None);
+
+        var defaultPassword = "P@ssw0rd";
+        //var defaultPassword = "T@mp0raryP@ss";
+        var result = await _userManager.CreateAsync(user, defaultPassword);
+
+        if (!result.Succeeded)
         {
-            string _userEmail = request.Login.Contains("@") ? request.Login : $"{request.Login}@store.tj";
-
-            var user = CreateUser();
-            user.Firstname = request.Firstname;
-            user.Lastname = request.Lastname;
-            user.Address = request.Address;
-            user.StoreId = request.StoreId;
-            user.StoreName = request.StoreName;
-            user.PhoneNumber = request.Phone;
-
-            await _userStore.SetUserNameAsync(user, request.Login, CancellationToken.None);
-            var emailStore = GetEmailStore();
-            await emailStore.SetEmailAsync(user, _userEmail, CancellationToken.None);
-            //await emailStore.SetEmailConfirmedAsync(user, true, CancellationToken.None);
-
-            var defaultPassword = "P@ssw0rd";
-            //var defaultPassword = "T@mp0raryP@ss";
-            var result = await _userManager.CreateAsync(user, defaultPassword);
-
-            if (!result.Succeeded)
-            {
-                return (result.Errors, string.Empty);
-            }
-
-            var roleResult = await _userManager.AddToRoleAsync(user, request.Role);
-            if (!roleResult.Succeeded)
-            {
-                return (roleResult.Errors, string.Empty);
-            }
-
-            var userId = await _userManager.GetUserIdAsync(user);
-            return (Enumerable.Empty<IdentityError>(), userId);
+            return (result.Errors, string.Empty);
         }
-        catch (Exception ex)
+
+        var roleResult = await _userManager.AddToRoleAsync(user, request.Role);
+        if (!roleResult.Succeeded)
         {
-
-            throw;
+            return (roleResult.Errors, string.Empty);
         }
+
+        var userId = await _userManager.GetUserIdAsync(user);
+        return (Enumerable.Empty<IdentityError>(), userId);
     }
 
     private ApplicationUser CreateUser()

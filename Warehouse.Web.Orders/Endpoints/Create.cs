@@ -24,7 +24,12 @@ public class Create : Endpoint<CreateOrderRequest>
 
     public override async Task HandleAsync(CreateOrderRequest req, CancellationToken ct)
     {
-        var dt = DateTime.ParseExact(req.Date, "ddMMyyyyHHmm", CultureInfo.InvariantCulture);
+        if (!DateTime.TryParseExact(req.Date, "ddMMyyyyHHmm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+        {
+            AddError("Invalid date format. Expected ddMMyyyyHHmm.");
+            await SendErrorsAsync(400, ct);
+            return;
+        }
 
         var command = new CreateOrderCommand(dt, req.DocId, req.StoreId, req.AgentId, req.Amount, req.Comment, req.Type, req.Agents);
         var commandResult = await _mediator.Send(command);

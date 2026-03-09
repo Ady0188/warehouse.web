@@ -1,5 +1,6 @@
-﻿using Ardalis.Result;
+using Ardalis.Result;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Warehouse.Web.Agents.Contracts;
 using Warehouse.Web.Stores.Contracts;
 
@@ -11,12 +12,14 @@ namespace Warehouse.Web.Orders.UseCases.Commands
         private readonly IOrderRepository _orderRepository;
         private readonly IMediator _mediator;
         private readonly ICurrentUser _currentUser;
+        private readonly ILogger<CreateOrderCommandHandler> _logger;
 
-        public CreateOrderCommandHandler(IOrderRepository orderRepository, IMediator mediator, ICurrentUser currentUser)
+        public CreateOrderCommandHandler(IOrderRepository orderRepository, IMediator mediator, ICurrentUser currentUser, ILogger<CreateOrderCommandHandler> logger)
         {
             _orderRepository = orderRepository;
             _mediator = mediator;
             _currentUser = currentUser;
+            _logger = logger;
         }
 
         public async Task<Result> Handle(CreateOrderCommand request, CancellationToken cancellationToken)
@@ -55,6 +58,7 @@ namespace Warehouse.Web.Orders.UseCases.Commands
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to create order (StoreId={StoreId}, AgentId={AgentId}).", request.StoreId, request.AgentId);
                 return Result.Error(ex.Message);
             }
         }

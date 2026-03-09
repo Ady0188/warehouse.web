@@ -5,6 +5,8 @@ using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using System.Drawing.Printing;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using Warehouse.Web.Reporting.Contracts;
 using Warehouse.Web.Reporting.Integrations;
 using Warehouse.Web.Shared;
@@ -21,14 +23,16 @@ internal class Print : Endpoint<PrintRequest, string>
     private readonly IWebHostEnvironment _env;
     private readonly IConverter _converter;
     private readonly IMediator _mediator;
+    private readonly ILogger<Print> _logger;
 
-    public Print(ProductTurnoverIngestionService productTurnoverIngestionService, IReportService reportService, IConverter converter, IWebHostEnvironment env, IMediator mediator)
+    public Print(ProductTurnoverIngestionService productTurnoverIngestionService, IReportService reportService, IConverter converter, IWebHostEnvironment env, IMediator mediator, ILogger<Print> logger)
     {
         _productTurnoverIngestionService = productTurnoverIngestionService;
         _reportService = reportService;
         _converter = converter;
         _env = env;
         _mediator = mediator;
+        _logger = logger;
     }
 
     public override void Configure()
@@ -39,9 +43,15 @@ internal class Print : Endpoint<PrintRequest, string>
 
     public override async Task HandleAsync(PrintRequest req, CancellationToken ct)
     {
-        var turnovers = await _productTurnoverIngestionService.GetAllTurnoversWithProductsAsync(DateTime.Now);
+        if (!Regex.IsMatch(req.TemplateName, "^[A-Za-z0-9_-]+$"))
+        {
+            AddError("Invalid template name.");
+            await SendErrorsAsync(400, ct);
+            return;
+        }
 
-        var operation = turnovers.FirstOrDefault(x => x.ObjectId == req.OperationId);
+        var operation = await _productTurnoverIngestionService
+            .GetTurnoverWithProductsByObjectAsync(req.OperationId, "Operation");
 
         if (operation is null)
         {
@@ -66,13 +76,13 @@ internal class Print : Endpoint<PrintRequest, string>
             return;
         }
         
-        var template = File.ReadAllText(Path.Combine("Templates", $"{req.TemplateName}.html"));
-        var result = await PrintOperationAsync(operation, new string[] { template }, agentDebts);
+        var template = await File.ReadAllTextAsync(Path.Combine("Templates", $"{req.TemplateName}.html"), ct);
+        var result = await PrintOperationAsync(operation, new string[] { template }, agentDebts, ct);
 
         await SendAsync(result);
     }
 
-    async Task<string> PrintOperationAsync(ProductTurnover request, string[] pages, AgentDebtsResponse agentDebts)
+    async Task<string> PrintOperationAsync(ProductTurnover request, string[] pages, AgentDebtsResponse agentDebts, CancellationToken ct)
     {
         var imgPath = Path.Combine(_env.WebRootPath);
 
@@ -117,13 +127,14 @@ internal class Print : Endpoint<PrintRequest, string>
 
             byte[] pdf = _converter.Convert(doc);
 
-            System.IO.File.WriteAllBytes(pathToSave, pdf);
+            await System.IO.File.WriteAllBytesAsync(pathToSave, pdf, ct);
 
             ////Return the file
             //return File(pdf, "application/pdf", "generated.pdf");
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to generate print file for operation {OperationId}.", request.ObjectId);
             throw;
         }
 

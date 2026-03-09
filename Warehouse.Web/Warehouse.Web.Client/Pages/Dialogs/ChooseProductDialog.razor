@@ -200,6 +200,8 @@
 
         if (!firstRender || IsEdit) return;
 
+        await Task.Delay(500);
+
         // 1) фокусим поле (каретка в инпуте)
         await productAuto.FocusAsync();
 

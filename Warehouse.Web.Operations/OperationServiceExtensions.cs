@@ -30,6 +30,7 @@ namespace Warehouse.Web.Operations
             mediatRAssemblies.Add(typeof(OperationServiceExtensions).Assembly);
 
             services.AddHostedService<MigrationsHostedService>();
+            services.AddHostedService<ReportOutboxProcessor>();
 
             logger.Information("{Module} module services registered", "Operations");
 

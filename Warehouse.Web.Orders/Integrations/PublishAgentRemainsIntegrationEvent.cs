@@ -31,7 +31,8 @@ namespace Warehouse.Web.Orders.Integrations
                 ObjectType = (short)notification.Order.Type,
                 Amount = notification.Order.Amount * inOrOut,
                 Disctount = 0,
-                Date = notification.Order.Date
+                Date = notification.Order.Date,
+                Method = notification.Method
             };
 
             var integrationEvent = new AgentRemainsIntegrationEvent(dto);
